@@ -14,10 +14,10 @@ from groq import Groq
 # ============================================================================
 # API KEYS (Paste yours here)
 # ============================================================================
-GROQ_API_KEY = "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"
-UNSPLASH_API_KEY = "Sd-1Q9umucyxNVB-_Chdw3eT650JbtsPWVqbT4rcrI"
-NASA_API_KEY = "wb3vqzDDai8HXd7Zi79dPzB6anvfEzGK58ZMkjWG"
-N2YO_API_KEY = "GPXPJ2-PWJBG4-NGSN6A-5SNP"
+GROQ_API_KEY = "Paste_Here"
+UNSPLASH_API_KEY = "Paste_Here"
+NASA_API_KEY = "Paste_Here"
+N2YO_API_KEY = "Paste_Here"
 
 MODEL_NAME = "llama-3.3-70b-versatile"
 MAX_HISTORY_TURNS = 10
