@@ -17,7 +17,7 @@
  - Quantity: 1
  - Vendor: amazon.in
  - Price: ₹4,499
- - Image: [WaveshareIPSDisplay.jpg](images/WaveshareIPSDisplay.jpg)
+ - Image: [Waveshare IPS Display](images/Waveshare%20IPS%20Display.jpg)
    
 ### Logic Level Shifter (SN74AHCT125N)
  - Type: Logic Level Shifter
