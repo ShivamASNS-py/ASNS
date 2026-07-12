@@ -3,7 +3,7 @@
  - Quantity: 1
  - Vendor: amazon.in
  - Price: ₹2,900
- - Image: [images/ESP32-WROVER-IE] (images/ESP32-WROVER-IE.jpg)
+ - Image: [ESP32-WROVER-IE.jpg](images/ESP32-WROVER-IE.jpg)
 
 ### WS2812B (5V, 5m, 60 LEDs/m — 300 LEDs)
  - Type: Addressable RGB LED Strip
