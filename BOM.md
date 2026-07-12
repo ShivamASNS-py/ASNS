@@ -24,7 +24,7 @@
  - Quantity: 3
  - Vendor: robu.in
  - Price: ₹80
- - Image: [Logic level shifter.jpg](images/Logic20%level20%shifter.jpg)
+ - Image: [Logic level shifters.jpg](images/Logic20%level20%shifters.jpg)
    
 ### Capacitor 1000µF / 6.3V (Electrolytic)
  - Type: Capacitor
