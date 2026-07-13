@@ -14,7 +14,7 @@ from groq import Groq
 # ============================================================================
 # API KEYS (Paste yours here)
 # ============================================================================
-GROQ_API_KEY = "Paste_Here"
+GROQ_API_KEY = "GROQ_API_KEY"
 UNSPLASH_API_KEY = "Paste_Here"
 NASA_API_KEY = "Paste_Here"
 N2YO_API_KEY = "Paste_Here"
