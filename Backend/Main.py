@@ -242,19 +242,24 @@ def handle_message(message):
     try:
         answer = get_nova_response(message.text)
         
-        # Check if Nova injected an image token at the end of the text string
+        # Check if Nova injected an image token
         if " | IMAGE_URL:" in answer:
             parts = answer.split(" | IMAGE_URL:")
             text_caption = parts[0].strip()
             image_url = parts[1].strip()
             
-            # Send as a real visual photo attachment with Nova's thoughts as the description text!
-            bot.send_photo(message.chat.id, image_url, caption=text_caption)
+            # SAFETY CHECK: Does the URL actually look like a web link?
+            if image_url.startswith("http"):
+                bot.send_photo(message.chat.id, image_url, caption=text_caption)
+            else:
+                # If it's an error message instead of a URL, send it as normal text
+                bot.reply_to(message, f"{text_caption}\n\n⚠️ Image Search Issue: {image_url}")
         else:
             bot.reply_to(message, answer)
             
     except Exception as e:
         bot.reply_to(message, f"⚠️ Frontend UI Error: {str(e)}")
+
 
 def run_telegram_bot():
     bot.infinity_polling()
