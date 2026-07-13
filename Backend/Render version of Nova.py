@@ -3,11 +3,8 @@ import requests
 from groq import Groq
 from dotenv import load_dotenv
 
-# Load environment variables (API keys)
 load_dotenv()
 
-# Initialize Groq Client
-# Render allows you to set these securely in the dashboard under "Environment Variables"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 NASA_API_KEY = os.getenv("NASA_API_KEY")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
@@ -17,7 +14,6 @@ if not GROQ_API_KEY:
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 
-# Simple in-memory chat history tracker (Headless)
 chat_history = [
     {
         "role": "system",
@@ -25,16 +21,10 @@ chat_history = [
     }
 ]
 
-# ==========================================
-# CORE TOOLS (NASA, N2YO, Planetary DB)
-# ==========================================
-
 def fetch_satellite_telemetry(norad_id):
-    """Fetches live altitude and coordinates for a given satellite ID from N2YO."""
     if not N2YO_API_KEY:
         return "N2YO API key missing."
     
-    # Using ISS (25544) as a default example if none provided
     id_to_query = norad_id if norad_id else "25544"
     url = f"https://api.n2yo.com/rest/v1/satellite/positions/{id_to_query}/0/0/0/1/&apiKey={N2YO_API_KEY}"
     
@@ -53,7 +43,6 @@ def fetch_satellite_telemetry(norad_id):
         return f"Error fetching satellite data: {str(e)}"
 
 def fetch_space_weather():
-    """Fetches recent Coronal Mass Ejections from NASA DONKI."""
     if not NASA_API_KEY:
         return "NASA API key missing."
     
@@ -73,7 +62,6 @@ def fetch_space_weather():
         return f"Error fetching space weather: {str(e)}"
 
 def fetch_planet_data(planet_name):
-    """Fetches exact physical dimensions from the open Le Système Solaire API."""
     url = f"https://api.le-systeme-solaire.net/rest/bodies/{planet_name.lower()}"
     try:
         response = requests.get(url, timeout=10)
@@ -87,18 +75,11 @@ def fetch_planet_data(planet_name):
     except Exception as e:
         return f"Error connecting to planetary database: {str(e)}"
 
-# ==========================================
-# THE BRAIN (Groq Execution & Routing)
-# ==========================================
-
 def process_nova_response(user_input):
-    """Processes user queries, determines if tools are required, and generates the final response."""
     global chat_history
     
-    # 1. Append user input to history
     chat_history.append({"role": "user", "content": user_input})
     
-    # 2. Define tools for Groq to leverage
     tools = [
         {
             "type": "function",
@@ -137,7 +118,6 @@ def process_nova_response(user_input):
     ]
     
     try:
-        # First pass: Check if Groq wants to call a tool
         response = groq_client.chat.completions.create(
             model="llama3-70b-8192",
             messages=chat_history,
@@ -148,7 +128,6 @@ def process_nova_response(user_input):
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
         
-        # 3. Handle tool routing if needed
         if tool_calls:
             chat_history.append(response_message)
             
@@ -174,7 +153,6 @@ def process_nova_response(user_input):
                     "content": tool_output
                 })
             
-            # Second pass: Get final synthesis from Groq
             final_response = groq_client.chat.completions.create(
                 model="llama3-70b-8192",
                 messages=chat_history
@@ -183,16 +161,12 @@ def process_nova_response(user_input):
         else:
             answer = response_message.content
             
-        # Keep history clean and relevant
         chat_history.append({"role": "assistant", "content": answer})
         return answer
 
     except Exception as e:
         return f"Brain Execution Error: {str(e)}"
 
-# ==========================================
-# TERMINAL TESTING BLOCK
-# ==========================================
 if __name__ == "__main__":
     print("==================================================")
     print("  NOVA HEADLESS ENGINE ONLINE (Terminal Test mode) ")
