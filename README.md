@@ -28,7 +28,9 @@ Menu — Settings, Brightness, Wi-Fi, Sleep, About
 ⌂
 Home — return to main screen instantly
 Ambient color is chosen manually from a scrollable bar of 10+ named colors (e.g. Aurora Green). Everything is currently user-selected rather than automatic — you choose what mode you're in.
-Hardware
+
+# Hardware
+
 Full parts list with vendors, prices, and photos in BOM.md.
 ESP32-WROVER-IE
 WS2812B 5V LED strip (5m, 60 LEDs/m — 300 LEDs)
