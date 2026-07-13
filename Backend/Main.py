@@ -1,22 +1,30 @@
 import os
 import requests
+import threading
 from groq import Groq
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
+import telebot
 
 load_dotenv()
 
+# ==========================================
+# CONFIGURATION & API KEYS
+# ==========================================
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 NASA_API_KEY = os.getenv("NASA_API_KEY")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 if not GROQ_API_KEY:
     raise ValueError("Missing GROQ_API_KEY.")
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("Missing TELEGRAM_BOT_TOKEN.")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
-
-app = FastAPI()
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
 chat_history = [
     {
@@ -25,9 +33,9 @@ chat_history = [
     }
 ]
 
-class ChatRequest(BaseModel):
-    message: str
-
+# ==========================================
+# SENSOR TOOLS
+# ==========================================
 def fetch_satellite_telemetry(norad_id):
     if not N2YO_API_KEY:
         return "N2YO API key missing."
@@ -82,14 +90,11 @@ def fetch_planet_data(planet_name):
     except Exception as e:
         return f"Error connecting to planetary database: {str(e)}"
 
-@app.get("/")
-def home():
-    return {"status": "online", "agent": "Nova"}
-
-@app.post("/chat")
-def chat(payload: ChatRequest):
+# ==========================================
+# CORE BRAIN LOGIC
+# ==========================================
+def get_nova_response(user_input: str) -> str:
     global chat_history
-    user_input = payload.message
     chat_history.append({"role": "user", "content": user_input})
     
     tools = [
@@ -172,8 +177,62 @@ def chat(payload: ChatRequest):
             answer = response_message.content
             
         chat_history.append({"role": "assistant", "content": answer})
-        return {"response": answer}
+        return answer
 
+    except Exception as e:
+        return f"Brain Execution Error: {str(e)}"
+
+# ==========================================
+# TELEGRAM FRONTEND (THE BODY)
+# ==========================================
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    bot.reply_to(
+        message, 
+        "🚀 *Nova is online.* Brain and Body merged on Render. Sensors active. What do you want to explore today?",
+        parse_mode="Markdown"
+    )
+
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    try:
+        # Directly call the brain locally without HTTP requests!
+        answer = get_nova_response(message.text)
+        bot.reply_to(message, answer)
+    except Exception as e:
+        bot.reply_to(message, f"⚠️ Backend Error: {str(e)}")
+
+def run_telegram_bot():
+    """Runs the Telegram bot in an infinite loop"""
+    bot.infinity_polling()
+
+# ==========================================
+# FASTAPI BACKEND (THE SERVER)
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # When FastAPI starts, spin up the Telegram bot in a background thread
+    print("Starting Telegram Bot Thread...")
+    thread = threading.Thread(target=run_telegram_bot, daemon=True)
+    thread.start()
+    yield
+    # (Optional cleanup code goes here if needed)
+
+app = FastAPI(lifespan=lifespan)
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.get("/")
+def home():
+    return {"status": "online", "agent": "Nova", "telegram_bot": "active"}
+
+@app.post("/chat")
+def chat(payload: ChatRequest):
+    try:
+        answer = get_nova_response(payload.message)
+        return {"response": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
