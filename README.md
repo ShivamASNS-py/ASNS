@@ -59,12 +59,13 @@ API purposes,
 
 5. Le Système Solaire = Static planetary data (gravity, mass, moons) "Certainly it's free(no API required)"
 
-# Project status
+# Project status✅
 
-✅ Backend (Nova) — functionally complete
+ Backend (Nova) — functionally complete
 🔧 Firmware — in progress (on-device filter design, ESP32↔Nova integration pending)
 🔧 Hardware — wiring diagrams and enclosure design in progress
 🔧 UI/UX — LVGL implementation pending
+
 Known limitation: Nova is being migrated from a manually-run local script to a lightweight hosted web API (free-tier cloud deployment), so it can be reached by the ESP32 over HTTPS at any time. This wrapping/deployment step is in progress.
 
 Setup
