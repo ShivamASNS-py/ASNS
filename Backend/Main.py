@@ -131,7 +131,7 @@ def chat(payload: ChatRequest):
     
     try:
         response = groq_client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama-3.3-70b-versatile",
             messages=chat_history,
             tools=tools,
             tool_choice="auto"
@@ -164,7 +164,7 @@ def chat(payload: ChatRequest):
                 })
             
             final_response = groq_client.chat.completions.create(
-                model="llama3-70b-8192",
+                model="llama-3.3-70b-versatile",
                 messages=chat_history
             )
             answer = final_response.choices[0].message.content
