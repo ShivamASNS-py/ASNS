@@ -1,3 +1,5 @@
+# ASNS
+
 🌌 Ambient Space Notification System (ASNS)
 Ever been sitting at your desk and wondered what's happening in space right now? Most of us don't check NASA's website every hour — and if you do, that's honestly impressive.
 ASNS is a desk companion that quietly keeps you connected to space. A wall-mounted LED strip runs subtle ambient lighting behind your desk, and shifts into short notification animations when something real happens — a solar flare, an ISS pass overhead, a shift in Earth's weather systems. No app to check, no feed to scroll. Just a glance at your wall.
