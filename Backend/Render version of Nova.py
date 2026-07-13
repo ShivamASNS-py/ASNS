@@ -2,6 +2,8 @@ import os
 import requests
 from groq import Groq
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 load_dotenv()
 
@@ -10,9 +12,11 @@ NASA_API_KEY = os.getenv("NASA_API_KEY")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 
 if not GROQ_API_KEY:
-    raise ValueError("Missing GROQ_API_KEY. Please set it in your environment variables.")
+    raise ValueError("Missing GROQ_API_KEY.")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
+
+app = FastAPI()
 
 chat_history = [
     {
@@ -20,6 +24,9 @@ chat_history = [
         "content": "You are Nova, an advanced space and astronomy assistant. You have access to real-time tools for satellites, space weather, and planet physics. Keep responses sharp, accurate, and engaging."
     }
 ]
+
+class ChatRequest(BaseModel):
+    message: str
 
 def fetch_satellite_telemetry(norad_id):
     if not N2YO_API_KEY:
@@ -75,9 +82,14 @@ def fetch_planet_data(planet_name):
     except Exception as e:
         return f"Error connecting to planetary database: {str(e)}"
 
-def process_nova_response(user_input):
+@app.get("/")
+def home():
+    return {"status": "online", "agent": "Nova"}
+
+@app.post("/chat")
+def chat(payload: ChatRequest):
     global chat_history
-    
+    user_input = payload.message
     chat_history.append({"role": "user", "content": user_input})
     
     tools = [
@@ -135,8 +147,6 @@ def process_nova_response(user_input):
                 function_name = tool_call.function.name
                 function_args = eval(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
                 
-                print(f"--- [SYSTEM]: Nova's brain invoked tool: {function_name} ---")
-                
                 if function_name == "fetch_satellite_telemetry":
                     tool_output = fetch_satellite_telemetry(norad_id=function_args.get("norad_id"))
                 elif function_name == "fetch_space_weather":
@@ -162,21 +172,12 @@ def process_nova_response(user_input):
             answer = response_message.content
             
         chat_history.append({"role": "assistant", "content": answer})
-        return answer
+        return {"response": answer}
 
     except Exception as e:
-        return f"Brain Execution Error: {str(e)}"
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    print("==================================================")
-    print("  NOVA HEADLESS ENGINE ONLINE (Terminal Test mode) ")
-    print("==================================================")
-    print("Type 'exit' to turn off the brain.\n")
-    
-    while True:
-        query = input("You: ")
-        if query.lower() == 'exit':
-            break
-        
-        reply = process_nova_response(query)
-        print(f"\nNova: {reply}\n")
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
