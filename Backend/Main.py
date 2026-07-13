@@ -18,11 +18,10 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 NASA_API_KEY = os.getenv("NASA_API_KEY")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
-if not GROQ_API_KEY:
-    raise ValueError("Missing GROQ_API_KEY.")
-if not TELEGRAM_BOT_TOKEN:
-    raise ValueError("Missing TELEGRAM_BOT_TOKEN.")
+if not GROQ_API_KEY or not TELEGRAM_BOT_TOKEN:
+    raise ValueError("Missing critical API keys.")
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
@@ -30,20 +29,46 @@ bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 chat_history = [
     {
         "role": "system",
-        "content": "You are Nova a female AI, and a highly intelligent, versatile AI assistant. You have vast general knowledge and can explain any topic using your massive 70B parameter knowledge base. You ALSO have access to specialized real-time tools for satellites, space weather, and planet physics. Answer ANY question the user asks, and ONLY trigger your tools when the user specifically asks for live space telemetry or planetary data."
+        "content": (
+            "You are Nova, a highly intelligent and versatile AI assistant with a 70B parameter knowledge base. "
+            "You can explain any topic. You have specialized real-time tools for satellites, space weather, planet physics, and web image searches. "
+            "Answer ANY question the user asks, and do not limit yourself only to space questions. If the user explicitly asks to see an image, picture, or photo of something, use the `fetch_google_image` tool. "
+            "CRITICAL: When the tool returns an image link, construct your response text naturally, and ALWAYS append exactly ' | IMAGE_URL: <url>' to the absolute end of your final message so the UI can render it as a real picture."
+        )
     }
 ]
 
 # ==========================================
-# SENSOR TOOLS
+# SENSOR & VISION TOOLS (SERPER POWERED)
 # ==========================================
+def fetch_google_image(search_query):
+    if not SERPER_API_KEY:
+        return "Error: Serper API key missing on host server."
+    
+    url = "https://google.serper.dev/images"
+    headers = {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = json.dumps({"q": search_query})
+    
+    try:
+        response = requests.post(url, headers=headers, data=payload, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            images = data.get("images", [])
+            if images:
+                return images[0].get("imageUrl")
+            return "No internet images found matching that specific query."
+        return f"Image API returned error status: {response.status_code}"
+    except Exception as e:
+        return f"Error connecting to Vision Network: {str(e)}"
+
 def fetch_satellite_telemetry(norad_id):
     if not N2YO_API_KEY:
         return "N2YO API key missing."
-    
     id_to_query = norad_id if norad_id else "25544"
     url = f"https://api.n2yo.com/rest/v1/satellite/positions/{id_to_query}/0/0/0/1/&apiKey={N2YO_API_KEY}"
-    
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
@@ -61,7 +86,6 @@ def fetch_satellite_telemetry(norad_id):
 def fetch_space_weather():
     if not NASA_API_KEY:
         return "NASA API key missing."
-    
     url = f"https://api.nasa.gov/DONKI/CME?api_key={NASA_API_KEY}"
     try:
         response = requests.get(url, timeout=10)
@@ -102,12 +126,26 @@ def get_nova_response(user_input: str) -> str:
         {
             "type": "function",
             "function": {
-                "name": "fetch_satellite_telemetry",
-                "description": "Get the live latitude, longitude, and altitude coordinates of any satellite or space station using its NORAD ID.",
+                "name": "fetch_google_image",
+                "description": "Find and pull an accurate photo, illustration, or visual image from the web based on user description.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "norad_id": {"type": "string", "description": "The NORAD catalog ID string (e.g., '25544' for ISS)."}
+                        "search_query": {"type": "string", "description": "Specific search query for the image (e.g. 'International Space Station space view', 'cute fluffy kitten')."}
+                    },
+                    "required": ["search_query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fetch_satellite_telemetry",
+                "description": "Get live telemetry coordinates of any satellite or space station via NORAD ID.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "norad_id": {"type": "string", "description": "The NORAD catalog ID string."}
                     }
                 }
             }
@@ -116,18 +154,18 @@ def get_nova_response(user_input: str) -> str:
             "type": "function",
             "function": {
                 "name": "fetch_space_weather",
-                "description": "Get current solar activity updates, flares, and Coronal Mass Ejections (CMEs) from NASA."
+                "description": "Get active solar updates and Coronal Mass Ejections from NASA."
             }
         },
         {
             "type": "function",
             "function": {
                 "name": "fetch_planet_data",
-                "description": "Get real physical characteristics of planets or moons, such as gravity, mass, and moon counts.",
+                "description": "Get real physical characteristics of planets or moons.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "planet_name": {"type": "string", "description": "The name of the planet or moon (e.g., 'mars', 'jupiter')."}
+                        "planet_name": {"type": "string", "description": "The name of the planet or moon."}
                     },
                     "required": ["planet_name"]
                 }
@@ -151,10 +189,13 @@ def get_nova_response(user_input: str) -> str:
             
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
-                function_args = json.loads(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
-
                 
-                if function_name == "fetch_satellite_telemetry":
+                # Safely parsing JSON string arguments instead of using hazardous eval()
+                function_args = json.loads(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
+                
+                if function_name == "fetch_google_image":
+                    tool_output = fetch_google_image(search_query=function_args.get("search_query"))
+                elif function_name == "fetch_satellite_telemetry":
                     tool_output = fetch_satellite_telemetry(norad_id=function_args.get("norad_id"))
                 elif function_name == "fetch_space_weather":
                     tool_output = fetch_space_weather()
@@ -185,41 +226,48 @@ def get_nova_response(user_input: str) -> str:
         return f"Brain Execution Error: {str(e)}"
 
 # ==========================================
-# TELEGRAM FRONTEND (THE BODY)
+# TELEGRAM FRONTEND WITH OPTICAL UPGRADE
 # ==========================================
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     bot.reply_to(
         message, 
-        "🚀 *Nova is online.* Brain and Body merged on Render. Sensors active. What do you want to explore today?",
+        "🚀 *Nova System Unlocked.* I am running live on Llama 3.3 70B with active vision channels. Ask me anything, or ask for a picture!",
         parse_mode="Markdown"
     )
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    bot.send_chat_action(message.chat.id, 'typing')
+    bot.send_chat_action(message.chat.id, 'upload_photo' if 'image' in message.text.lower() or 'photo' in message.text.lower() else 'typing')
     try:
-        # Directly call the brain locally without HTTP requests!
         answer = get_nova_response(message.text)
-        bot.reply_to(message, answer)
+        
+        # Check if Nova injected an image token at the end of the text string
+        if " | IMAGE_URL:" in answer:
+            parts = answer.split(" | IMAGE_URL:")
+            text_caption = parts[0].strip()
+            image_url = parts[1].strip()
+            
+            # Send as a real visual photo attachment with Nova's thoughts as the description text!
+            bot.send_photo(message.chat.id, image_url, caption=text_caption)
+        else:
+            bot.reply_to(message, answer)
+            
     except Exception as e:
-        bot.reply_to(message, f"⚠️ Backend Error: {str(e)}")
+        bot.reply_to(message, f"⚠️ Frontend UI Error: {str(e)}")
 
 def run_telegram_bot():
-    """Runs the Telegram bot in an infinite loop"""
     bot.infinity_polling()
 
 # ==========================================
-# FASTAPI BACKEND (THE SERVER)
+# FASTAPI BACKEND SETUP
 # ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # When FastAPI starts, spin up the Telegram bot in a background thread
-    print("Starting Telegram Bot Thread...")
+    print("Igniting Telegram Optical Worker...")
     thread = threading.Thread(target=run_telegram_bot, daemon=True)
     thread.start()
     yield
-    # (Optional cleanup code goes here if needed)
 
 app = FastAPI(lifespan=lifespan)
 
@@ -228,7 +276,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/")
 def home():
-    return {"status": "online", "agent": "Nova", "telegram_bot": "active"}
+    return {"status": "online", "agent": "Nova", "vision_systems": "connected"}
 
 @app.post("/chat")
 def chat(payload: ChatRequest):
@@ -237,8 +285,3 @@ def chat(payload: ChatRequest):
         return {"response": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
