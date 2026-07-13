@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 import threading
 from groq import Groq
@@ -150,7 +151,8 @@ def get_nova_response(user_input: str) -> str:
             
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
-                function_args = eval(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
+                function_args = json.loads(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
+
                 
                 if function_name == "fetch_satellite_telemetry":
                     tool_output = fetch_satellite_telemetry(norad_id=function_args.get("norad_id"))
