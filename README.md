@@ -44,19 +44,21 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 Software
 Firmware (/firmware) — ESP32 C++ code: LVGL UI, LED strip control, on-device satellite filter, communication with Nova.
 Backend (/backend) — Nova, the AI layer. Python, ~800+ lines, built on Groq's llama-3.3-70b-versatile. Wrapped as a small web service and hosted on a free-tier cloud platform, so the ESP32 can reach it over HTTPS at all times without relying on a phone or laptop staying on.
-APIs used
-API
-Purpose
-Groq (Llama 3.3 70B)
-Core reasoning/filtering brain
-NASA (DONKI, EONET, image library)
-Sun activity, Earth events, imagery
-N2YO
-Live satellite/ISS telemetry, real-time position
-Unsplash
-Supplementary imagery for AI responses
-Le Système Solaire
-Static planetary data (gravity, mass, moons) — no key required
+
+# APIs
+
+API purposes,
+
+1. (Groq) = Assigning Llama 3.3
+
+2. NASA = (DONKI, EONET, image library) Sun activity, Earth events, imagery
+
+3. Unsplash = Supplementary imagery for AI response
+
+4. N2YO = satellite/ISS telemetry, real-time position 
+
+5. Le Système Solaire = Static planetary data (gravity, mass, moons) "Certainly it's free(no API required)"
+
 Project status
 ✅ Backend (Nova) — functionally complete
 🔧 Firmware — in progress (on-device filter design, ESP32↔Nova integration pending)
