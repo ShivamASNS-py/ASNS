@@ -44,9 +44,6 @@ chat_history = [
     }
 ]
 
-    }
-]
-
 
 # ==========================================
 # SENSOR & VISION TOOLS (SERPER POWERED)
