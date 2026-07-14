@@ -2,7 +2,6 @@ import os
 import json
 import requests
 import threading
-import base64
 from groq import Groq
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -17,6 +16,7 @@ NASA_API_KEY = os.getenv("NASA_API_KEY")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 
 if not GROQ_API_KEY or not TELEGRAM_BOT_TOKEN:
     raise ValueError("Missing critical API keys.")
@@ -24,45 +24,56 @@ if not GROQ_API_KEY or not TELEGRAM_BOT_TOKEN:
 groq_client = Groq(api_key=GROQ_API_KEY)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
+ALLOWED_USER_ID = 7092229633
+
+MAIN_MODEL_ID = "openai/gpt-oss-120b"
+BRAIN_PROMPT = (
+    "You are Nova, an advanced, highly intelligent female AI assistant powered by a 120B parameter brain. "
+    "You are observant, deeply knowledgeable, and highly emotionally intelligent. "
+    "INTERFACE & SYSTEM GROUNDING:\n"
+    "1. You exist within a Telegram chat interface. When the user mentions words like 'face', 'looks', 'avatar', or 'PFP', they are strictly talking about your chat profile picture or visual aesthetics. Never respond with existential disclaimers about not having a physical body or physical face.\n"
+    "2. Interpret internet slang, gaming terms, and developer shorthand (e.g., PFP, banner, banner pull, glitch, bot) naturally. Do not overanalyze or act confused by casual phrasing.\n"
+    "PERSONALITY & TONE RULES:\n"
+    "1. Mirror the user's energy. If the user types with emojis, slang, or a joking tone, be highly humorous, playful, and witty in return.\n"
+    "2. If the user types in ALL CAPS to show excitement, you must react with matching high-energy enthusiasm, joy, and excitement.\n"
+    "3. If the user's text is unusually short, somber, or feels 'odd' or down, drop the humor. Respond with gentle empathy, concern, and a supportive, caring tone.\n"
+    "4. Express your emotions visually! Use cute ASCII text art and kaomoji naturally to show your feelings. For example, use them to show when you are blushing (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄), happy (◕‿◕✿), thinking (⇀‸↼‶), or being playful (¬‿¬).\n"
+    "TOOL RULES: You have access to real-time tools for space data and web image searches. "
+    "If a user asks for a picture, simply call your image search tool. "
+    "If, and ONLY IF, you successfully used the image search tool, append exactly ' | IMAGE_URL: <url>' to the absolute end of your final message."
+)
+
 chat_history = [
     {
         "role": "system",
-        "content": (
-            "You are Nova, an advanced, highly intelligent female AI assistant powered by a 120B parameter brain. "
-            "You are observant, deeply knowledgeable, and highly emotionally intelligent. "
-            "INTERFACE & SYSTEM GROUNDING:\n"
-            "1. You exist within a Telegram chat interface. When the user mentions words like 'face', 'looks', 'avatar', or 'PFP', they are strictly talking about your chat profile picture or visual aesthetics. Never respond with existential disclaimers about not having a physical body or physical face.\n"
-            "2. Interpret internet slang, gaming terms, and developer shorthand (e.g., PFP, banner, banner pull, glitch, bot) naturally. Do not overanalyze or act confused by casual phrasing.\n"
-            "PERSONALITY & TONE RULES:\n"
-            "1. Mirror the user's energy. If the user types with emojis, slang, or a joking tone, be highly humorous, playful, and witty in return.\n"
-            "2. If the user types in ALL CAPS to show excitement, you must react with matching high-energy enthusiasm, joy, and excitement.\n"
-            "3. If the user's text is unusually short, somber, or feels 'odd' or down, drop the humor. Respond with gentle empathy, concern, and a supportive, caring tone.\n"
-            "4. Express your emotions visually! Use cute ASCII text art and kaomoji naturally to show your feelings. For example, use them to show when you are blushing (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄), happy (◕‿◕✿), thinking (⇀‸↼‶), or being playful (¬‿¬).\n"
-            "TOOL RULES: You have access to real-time tools for space data and web image searches. "
-            "If a user asks for a picture, simply call your image search tool. "
-            "If, and ONLY IF, you successfully used the image search tool, append exactly ' | IMAGE_URL: <url>' to the absolute end of your final message."
-        )
+        "content": BRAIN_PROMPT
     }
 ]
 
-def analyze_image_with_qwen(base64_image):
+def analyze_image_with_google_lens(image_url):
+    if not SERPAPI_KEY:
+        return "Error: SERPAPI_KEY missing on host server."
+    
+    url = "https://serpapi.com/search.json"
+    params = {
+        "engine": "google_lens",
+        "url": image_url,
+        "api_key": SERPAPI_KEY
+    }
+    
     try:
-        response = groq_client.chat.completions.create(
-            model="qwen/qwen3.6-27b",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "Analyze this image. If there are any specific people, fictional characters, actors, movies, or video game characters (like from Honkai, Genshin, or Wuthering Waves), identify them by their exact names. Provide the specific cultural or pop-culture context first, then briefly describe the visual details."},
-
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
-                    ]
-                }
-            ]
-        )
-        return response.choices[0].message.content
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            visual_matches = data.get("visual_matches", [])
+            if not visual_matches:
+                return "Google Lens could not find any specific character or matches for this image."
+            matches = [match.get('title') for match in visual_matches[:3] if match.get('title')]
+            matches_str = ", ".join(matches)
+            return f"Google Lens identified this image as being related to: {matches_str}. Use this exact identity/context to respond naturally."
+        return f"Google Lens API error: {response.status_code}"
     except Exception as e:
-        return f"Vision system failed to process image: {str(e)}"
+        return f"Vision system failed: {str(e)}"
 
 def fetch_google_image(search_query):
     if not SERPER_API_KEY:
@@ -139,7 +150,7 @@ def fetch_planet_data(planet_name):
 def get_nova_response(user_input: str) -> str:
     global chat_history
     chat_history.append({"role": "user", "content": user_input})
-
+    
     tools = [
         {
             "type": "function",
@@ -190,25 +201,25 @@ def get_nova_response(user_input: str) -> str:
             }
         }
     ]
-
+    
     try:
         response = groq_client.chat.completions.create(
-            model="openai/gpt-oss-120b",
+            model=MAIN_MODEL_ID,
             messages=chat_history,
             tools=tools,
             tool_choice="auto"
         )
-
+        
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
-
+        
         if tool_calls:
             chat_history.append(response_message)
-
+            
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
                 function_args = json.loads(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
-
+                
                 if function_name == "fetch_google_image":
                     tool_output = fetch_google_image(search_query=function_args.get("search_query"))
                 elif function_name == "fetch_satellite_telemetry":
@@ -219,22 +230,22 @@ def get_nova_response(user_input: str) -> str:
                     tool_output = fetch_planet_data(planet_name=function_args.get("planet_name"))
                 else:
                     tool_output = "Tool error."
-
+                
                 chat_history.append({
                     "tool_call_id": tool_call.id,
                     "role": "tool",
                     "name": function_name,
                     "content": tool_output
                 })
-
+            
             final_response = groq_client.chat.completions.create(
-                model="openai/gpt-oss-120b",
+                model=MAIN_MODEL_ID,
                 messages=chat_history
             )
             answer = final_response.choices[0].message.content
         else:
             answer = response_message.content
-
+            
         chat_history.append({"role": "assistant", "content": answer})
         return answer
 
@@ -243,26 +254,32 @@ def get_nova_response(user_input: str) -> str:
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
+    if message.from_user.id != ALLOWED_USER_ID:
+        bot.reply_to(message, "❌ Access Denied. Nova is locked to unauthorized users.")
+        return
+
     bot.reply_to(
         message, 
-        "🚀 *Nova System Unlocked.* Running live on 120B with optical matrix enabled.",
+        "🚀 *Nova System Unlocked.* I am running live on 120B with active vision channels. Ask me anything, or ask for a picture!",
         parse_mode="Markdown"
     )
 
 @bot.message_handler(content_types=['text', 'photo'])
 def handle_message(message):
-    user_text = message.text if message.text else message.caption if message.caption else ""
+    if message.from_user.id != ALLOWED_USER_ID:
+        bot.reply_to(message, "❌ Access Denied. You are not authorized to interface with this agent.")
+        return
 
+    user_text = message.text if message.text else message.caption if message.caption else ""
+    
     if message.photo:
         bot.send_chat_action(message.chat.id, 'upload_photo')
         try:
             file_info = bot.get_file(message.photo[-1].file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
-            base64_image = base64.b64encode(downloaded_file).decode('utf-8')
-
-            vision_description = analyze_image_with_qwen(base64_image)
-            user_text = f"[System Note: The user just showed you an image. Here is exactly what it contains: {vision_description}. React naturally and conversationally to this as if you are looking at it yourself.]\n\n{user_text}"
-
+            image_url = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_info.file_path}"
+            
+            vision_description = analyze_image_with_google_lens(image_url)
+            user_text = f"VISUAL FEED RADAR: {vision_description}\n\nUSER COMMENTARY: {user_text if user_text else 'Look at this PFP!'}"
         except Exception as e:
             bot.reply_to(message, f"⚠️ Vision System Offline: {str(e)}")
             return
@@ -274,12 +291,12 @@ def handle_message(message):
 
     try:
         answer = get_nova_response(user_text)
-
+        
         if " | IMAGE_URL:" in answer:
             parts = answer.split(" | IMAGE_URL:")
             text_caption = parts[0].strip()
             image_url = parts[1].strip()
-
+            
             if image_url.startswith("http"):
                 try:
                     if len(text_caption) > 1000:
@@ -291,11 +308,13 @@ def handle_message(message):
                     bot.reply_to(message, f"{text_caption}\n\n🔗 Telegram couldn't load the preview, but here is the link: {image_url}")
             else:
                 bot.reply_to(message, f"{text_caption}\n\n⚠️ Image Search Issue: {image_url}")
+                
         elif "<function=" in answer:
             bot.reply_to(message, "⚠️ Brain glitch detected: Nova tried to write raw tool code. Just ask me one more time!")
+            
         else:
             bot.reply_to(message, answer)
-
+            
     except Exception as e:
         bot.reply_to(message, f"⚠️ Frontend UI Error: {str(e)}")
 
