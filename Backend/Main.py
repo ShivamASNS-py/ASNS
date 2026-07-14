@@ -258,7 +258,8 @@ def handle_message(message):
             base64_image = base64.b64encode(downloaded_file).decode('utf-8')
             
             vision_description = analyze_image_with_qwen(base64_image)
-            user_text = f"[System Note: The user attached an image. Visual Cortex analysis: {vision_description}]\n\n{user_text}"
+            user_text = f"[System Note: The user just showed you an image. Here is exactly what it contains: {vision_description}. React naturally and conversationally to this as if you are looking at it yourself.]\n\n{user_text}"
+
         except Exception as e:
             bot.reply_to(message, f"⚠️ Vision System Offline: {str(e)}")
             return
