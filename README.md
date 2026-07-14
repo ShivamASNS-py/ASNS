@@ -68,11 +68,13 @@ API purposes,
 
 Nova is deployed as a hosted web API on Render. To avoid free-tier cold starts, the ESP32 sends a lightweight keep-alive ping roughly every 10 minutes to keep Nova warm, separate from its actual data requests (every 5–7 minutes). Filtering is split across two layers: a cheap on-device filter on the ESP32 handles satellite data (recognizing ~25–50 major satellites for fast notifications), while Nova runs the main filter for the six planetary/stellar categories (Mars, Earth, Moon, Sun, Saturn) that need more nuanced judgment.
 
-Setup
+Setup(Old)
 Create a .env file in /backend with:
 GROQ_API_KEY=
 NASA_API_KEY=
 UNSPLASH_API_KEY=
 N2YO_API_KEY=
+
+Current setup doesn't require's API's instead I can give permission to anyone wanting to use Nova in telegram and they can access it, as it is running on a cloud server while it's body is in (frontend) telegram.
 
 Built by a 15-year-old learning PCB design, embedded programming, API integration, AI, and product design — one debug session at a time. Submitted for the Hack Club Macondo grant.
