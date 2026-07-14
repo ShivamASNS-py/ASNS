@@ -8,7 +8,7 @@ A compact control unit sits on the desk — a 3D-printed, rounded 11.7 × 10.5 �
 # How it works
 
 ESP32-WROVER-IE polls Nova, the AI backend, over HTTPS for space event data.
-Nova (built on Groq's llama-3.3-70b-versatile) runs as a hosted web service, pulling from NASA (DONKI, EONET, image library), N2YO (live satellite/ISS telemetry), and Le Système Solaire (planetary data), then deciding what's actually worth surfacing — since raw satellite data alone updates constantly, and without filtering it would drown out every other signal.
+Nova (built on Groq's gpt-oss-120b) runs as a hosted web service, pulling from NASA (DONKI, EONET, image library), N2YO (live satellite/ISS telemetry), and Le Système Solaire (planetary data), then deciding what's actually worth surfacing — since raw satellite data alone updates constantly, and without filtering it would drown out every other signal.
 A lightweight on-device filter also runs directly on the ESP32, recognizing ~25–50 major satellites (ISS, Hubble, Starlink, etc.) so simple, high-value events — like "ISS visible in 5 minutes!" — can trigger a notification animation without waiting on a full AI round-trip.
 When nothing's happening, the WS2812B strip (5m, 300 LEDs) runs a user-selected ambient pattern — Deep Space, Starfield, Moonlight, Aurora, Mars Glow, Solar Wind — in warm, low-brightness tones so it's easy to leave running while working or studying.
 
@@ -43,13 +43,13 @@ Supporting passives (capacitors, resistors, JST connectors)
 Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), designed to sit unobtrusively on a desk. Wiring diagrams and enclosure sketches/renders are in hardware/.
 Software
 Firmware (/firmware) — ESP32 C++ code: LVGL UI, LED strip control, on-device satellite filter, communication with Nova.
-Backend (/backend) — Nova, the AI layer. Python, ~800+ lines, built on Groq's llama-3.3-70b-versatile. Wrapped as a small web service and hosted on a free-tier cloud platform, so the ESP32 can reach it over HTTPS at all times without relying on a phone or laptop staying on.
+Backend (/backend) — Nova, the AI layer. Python, ~800+ lines, built on Groq's gpt-oss-120b. Deployed as a web service on Render (free tier), so the ESP32 can reach it over HTTPS at all times without relying on a phone or laptop staying on.
 
 # APIs
 
 API purposes,
 
-1. (Groq) = Assigning Llama 3.3
+1. (Groq) = Assigning gpt-oss-120b
 
 2. NASA = (DONKI, EONET, image library) Sun activity, Earth events, imagery
 
@@ -61,12 +61,12 @@ API purposes,
 
 # Project status✅
 
- Backend (Nova) — functionally complete
+ Backend (Nova) — functionally complete, live on Render
 🔧 Firmware — in progress (on-device filter design, ESP32↔Nova integration pending)
 🔧 Hardware — wiring diagrams and enclosure design in progress
 🔧 UI/UX — LVGL implementation pending
 
-Known limitation: Nova is being migrated from a manually-run local script to a lightweight hosted web API (free-tier cloud deployment), so it can be reached by the ESP32 over HTTPS at any time. This wrapping/deployment step is in progress.
+Nova is deployed as a hosted web API on Render. To avoid free-tier cold starts, the ESP32 sends a lightweight keep-alive ping roughly every 10 minutes to keep Nova warm, separate from its actual data requests (every 5–7 minutes). Filtering is split across two layers: a cheap on-device filter on the ESP32 handles satellite data (recognizing ~25–50 major satellites for fast notifications), while Nova runs the main filter for the six planetary/stellar categories (Mars, Earth, Moon, Sun, Saturn) that need more nuanced judgment.
 
 Setup
 Create a .env file in /backend with:
