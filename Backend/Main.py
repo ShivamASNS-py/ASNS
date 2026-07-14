@@ -245,23 +245,35 @@ def handle_message(message):
     try:
         answer = get_nova_response(message.text)
         
-        # Check if Nova injected an image token
+        # 1. Did Nova successfully attach an image URL?
         if " | IMAGE_URL:" in answer:
             parts = answer.split(" | IMAGE_URL:")
             text_caption = parts[0].strip()
             image_url = parts[1].strip()
             
-            # SAFETY CHECK: Does the URL actually look like a web link?
             if image_url.startswith("http"):
-                bot.send_photo(message.chat.id, image_url, caption=text_caption)
+                # FIX FOR ERROR 2: Telegram's 1024 character limit!
+                # If the essay is too long, send the text first, then the photo.
+                if len(text_caption) > 1000:
+                    bot.reply_to(message, text_caption)
+                    bot.send_photo(message.chat.id, image_url, caption="Here is the image you requested! 🌌")
+                else:
+                    # If it's short enough, send them together normally.
+                    bot.send_photo(message.chat.id, image_url, caption=text_caption)
             else:
-                # If it's an error message instead of a URL, send it as normal text
                 bot.reply_to(message, f"{text_caption}\n\n⚠️ Image Search Issue: {image_url}")
+                
+        # 2. FIX FOR ERROR 1: Catching Llama's XML hallucination glitch
+        elif "<function=" in answer:
+            bot.reply_to(message, "⚠️ Brain glitch detected: Nova tried to write raw tool code instead of executing it. Please ask for the image one more time!")
+            
+        # 3. Normal text response
         else:
             bot.reply_to(message, answer)
             
     except Exception as e:
         bot.reply_to(message, f"⚠️ Frontend UI Error: {str(e)}")
+
 
 
 def run_telegram_bot():
