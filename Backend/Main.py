@@ -264,8 +264,8 @@ def handle_message(message):
                     else:
                         bot.send_photo(message.chat.id, image_url, caption=text_caption)
                 except Exception as photo_error:
-                    # NEW FALLBACK: If the website blocks Telegram, send the clickable link instead!
-                    bot.reply_to(message, f"{text_caption}\n\n🔗 *Telegram couldn't load the preview, but here is the link:* {image_url}", parse_mode="Markdown")
+                    # FIX: Removed Markdown formatting to prevent Kaomoji parsing crashes!
+                    bot.reply_to(message, f"{text_caption}\n\n🔗 Telegram couldn't load the preview, but here is the link: {image_url}")
             else:
                 bot.reply_to(message, f"{text_caption}\n\n⚠️ Image Search Issue: {image_url}")
                 
