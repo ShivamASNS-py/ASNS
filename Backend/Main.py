@@ -238,16 +238,26 @@ def get_nova_response(user_input: str) -> str:
                     "content": tool_output
                 })
             
-            final_response = groq_client.chat.completions.create(
+                        final_response = groq_client.chat.completions.create(
                 model=MAIN_MODEL_ID,
-                messages=chat_history
+                messages=chat_history,
+                tools=tools,
+                tool_choice="auto"
             )
-            answer = final_response.choices[0].message.content
+            
+            final_message = final_response.choices[0].message
+            
+            if final_message.tool_calls:
+                answer = final_message.content if final_message.content else "I have retrieved the data! 🌌"
+            else:
+                answer = final_message.content
+                
         else:
             answer = response_message.content
             
         chat_history.append({"role": "assistant", "content": answer})
         return answer
+
 
     except Exception as e:
         return f"Brain Execution Error: {str(e)}"
