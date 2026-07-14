@@ -75,7 +75,7 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 - 🔧 **Autonomous filtering** — Nova currently responds on-demand via chat; proactive polling + event-significance filtering (the core "notification" logic) is the current build focus
 - 🔧 **UI/UX** — LVGL implementation pending
 
-## Setup
+## Setup(OLD)
 
 Create a `.env` file in `/backend` with:
 ```
@@ -87,5 +87,9 @@ SERPER_API_KEY=
 ```
 
 ---
+
+# New
+
+Anyone can chat with Nova since she runs on telegram but the user must get allowance from me. No API's required.
 
 *Built by a 15-year-old learning PCB design, embedded programming, API integration, AI, and product design — one debug session at a time. Submitted for the Hack Club Macondo grant.*
