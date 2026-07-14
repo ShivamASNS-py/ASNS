@@ -304,4 +304,4 @@ def chat(payload: ChatRequest):
         answer = get_nova_response(payload.message)
         return {"response": answer}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) 
