@@ -50,7 +50,8 @@ def analyze_image_with_qwen(base64_image):
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Describe everything in this image in extreme detail."},
+                        {"type": "text", "text": "Analyze this image. If there are any specific people, fictional characters, actors, movies, or video game characters (like from Honkai, Genshin, or Wuthering Waves), identify them by their exact names. Provide the specific cultural or pop-culture context first, then briefly describe the visual details."},
+
                         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
                     ]
                 }
