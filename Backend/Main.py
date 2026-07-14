@@ -45,7 +45,7 @@ chat_history = [
 def analyze_image_with_qwen(base64_image):
     try:
         response = groq_client.chat.completions.create(
-            model="qwen-27b",
+            model="qwen/qwen3.6-27b",
             messages=[
                 {
                     "role": "user",
@@ -189,7 +189,7 @@ def get_nova_response(user_input: str) -> str:
     
     try:
         response = groq_client.chat.completions.create(
-            model="gpt-oss-120b",
+            model="openai/gpt-oss-120b",
             messages=chat_history,
             tools=tools,
             tool_choice="auto"
@@ -224,7 +224,7 @@ def get_nova_response(user_input: str) -> str:
                 })
             
             final_response = groq_client.chat.completions.create(
-                model="gpt-oss-120b",
+                model="openai/gpt-oss-120b",
                 messages=chat_history
             )
             answer = final_response.choices[0].message.content
