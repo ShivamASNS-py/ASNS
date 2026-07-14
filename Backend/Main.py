@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import threading
+import base64
 from groq import Groq
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -11,9 +12,6 @@ import telebot
 
 load_dotenv()
 
-# ==========================================
-# CONFIGURATION & API KEYS
-# ==========================================
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 NASA_API_KEY = os.getenv("NASA_API_KEY")
 N2YO_API_KEY = os.getenv("N2YO_API_KEY")
@@ -30,7 +28,7 @@ chat_history = [
     {
         "role": "system",
         "content": (
-            "You are Nova, an advanced, highly intelligent female AI assistant powered by a 70B parameter brain. "
+            "You are Nova, an advanced, highly intelligent female AI assistant powered by a 120B parameter brain. "
             "You are observant, deeply knowledgeable, and highly emotionally intelligent. "
             "PERSONALITY & TONE RULES: "
             "1. Mirror the user's energy. If the user types with emojis, slang, or a joking tone, be highly humorous, playful, and witty in return. "
@@ -44,21 +42,33 @@ chat_history = [
     }
 ]
 
+def analyze_image_with_qwen(base64_image):
+    try:
+        response = groq_client.chat.completions.create(
+            model="qwen-27b",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Describe everything in this image in extreme detail."},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}}
+                    ]
+                }
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Vision system failed to process image: {str(e)}"
 
-# ==========================================
-# SENSOR & VISION TOOLS (SERPER POWERED)
-# ==========================================
 def fetch_google_image(search_query):
     if not SERPER_API_KEY:
         return "Error: Serper API key missing on host server."
-    
     url = "https://google.serper.dev/images"
     headers = {
         "X-API-KEY": SERPER_API_KEY,
         "Content-Type": "application/json"
     }
     payload = json.dumps({"q": search_query})
-    
     try:
         response = requests.post(url, headers=headers, data=payload, timeout=10)
         if response.status_code == 200:
@@ -122,9 +132,6 @@ def fetch_planet_data(planet_name):
     except Exception as e:
         return f"Error connecting to planetary database: {str(e)}"
 
-# ==========================================
-# CORE BRAIN LOGIC
-# ==========================================
 def get_nova_response(user_input: str) -> str:
     global chat_history
     chat_history.append({"role": "user", "content": user_input})
@@ -182,7 +189,7 @@ def get_nova_response(user_input: str) -> str:
     
     try:
         response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="gpt-oss-120b",
             messages=chat_history,
             tools=tools,
             tool_choice="auto"
@@ -196,8 +203,6 @@ def get_nova_response(user_input: str) -> str:
             
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
-                
-                # Safely parsing JSON string arguments instead of using hazardous eval()
                 function_args = json.loads(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
                 
                 if function_name == "fetch_google_image":
@@ -219,7 +224,7 @@ def get_nova_response(user_input: str) -> str:
                 })
             
             final_response = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="gpt-oss-120b",
                 messages=chat_history
             )
             answer = final_response.choices[0].message.content
@@ -232,24 +237,39 @@ def get_nova_response(user_input: str) -> str:
     except Exception as e:
         return f"Brain Execution Error: {str(e)}"
 
-# ==========================================
-# TELEGRAM FRONTEND WITH OPTICAL UPGRADE
-# ==========================================
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     bot.reply_to(
         message, 
-        "🚀 *Nova System Unlocked.* I am running live on Llama 3.3 70B with active vision channels. Ask me anything, or ask for a picture!",
+        "🚀 *Nova System Unlocked.* Running live on 120B with optical matrix enabled.",
         parse_mode="Markdown"
     )
 
-@bot.message_handler(func=lambda message: True)
+@bot.message_handler(content_types=['text', 'photo'])
 def handle_message(message):
-    bot.send_chat_action(message.chat.id, 'upload_photo' if 'image' in message.text.lower() or 'photo' in message.text.lower() else 'typing')
+    user_text = message.text if message.text else message.caption if message.caption else ""
+    
+    if message.photo:
+        bot.send_chat_action(message.chat.id, 'upload_photo')
+        try:
+            file_info = bot.get_file(message.photo[-1].file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            base64_image = base64.b64encode(downloaded_file).decode('utf-8')
+            
+            vision_description = analyze_image_with_qwen(base64_image)
+            user_text = f"[System Note: The user attached an image. Visual Cortex analysis: {vision_description}]\n\n{user_text}"
+        except Exception as e:
+            bot.reply_to(message, f"⚠️ Vision System Offline: {str(e)}")
+            return
+    else:
+        bot.send_chat_action(message.chat.id, 'upload_photo' if 'image' in user_text.lower() or 'photo' in user_text.lower() else 'typing')
+
+    if not user_text.strip():
+        return
+
     try:
-        answer = get_nova_response(message.text)
+        answer = get_nova_response(user_text)
         
-        # 1. Did Nova successfully attach an image URL?
         if " | IMAGE_URL:" in answer:
             parts = answer.split(" | IMAGE_URL:")
             text_caption = parts[0].strip()
@@ -257,41 +277,28 @@ def handle_message(message):
             
             if image_url.startswith("http"):
                 try:
-                    # Try to send the actual photo file via Telegram
                     if len(text_caption) > 1000:
                         bot.reply_to(message, text_caption)
                         bot.send_photo(message.chat.id, image_url, caption="Here is the image you requested! 🌌")
                     else:
                         bot.send_photo(message.chat.id, image_url, caption=text_caption)
-                except Exception as photo_error:
-                    # FIX: Removed Markdown formatting to prevent Kaomoji parsing crashes!
+                except Exception:
                     bot.reply_to(message, f"{text_caption}\n\n🔗 Telegram couldn't load the preview, but here is the link: {image_url}")
             else:
                 bot.reply_to(message, f"{text_caption}\n\n⚠️ Image Search Issue: {image_url}")
-                
-        # 2. Catching Llama's XML hallucination glitch
         elif "<function=" in answer:
             bot.reply_to(message, "⚠️ Brain glitch detected: Nova tried to write raw tool code. Just ask me one more time!")
-            
-        # 3. Normal text response
         else:
             bot.reply_to(message, answer)
             
     except Exception as e:
         bot.reply_to(message, f"⚠️ Frontend UI Error: {str(e)}")
 
-
-
-
 def run_telegram_bot():
     bot.infinity_polling()
 
-# ==========================================
-# FASTAPI BACKEND SETUP
-# ==========================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Igniting Telegram Optical Worker...")
     thread = threading.Thread(target=run_telegram_bot, daemon=True)
     thread.start()
     yield
@@ -311,4 +318,4 @@ def chat(payload: ChatRequest):
         answer = get_nova_response(payload.message)
         return {"response": answer}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
