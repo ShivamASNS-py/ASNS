@@ -61,6 +61,13 @@
  - Price: ₹799
  - Image: [SMPS.jpg](images/SMPS.jpg)
 
+### Female DC connector
+ - Type: Connector
+ - Quantity: pack of 3 available only
+ - Vendor: amazon.in
+ - Price: ₹93
+ - Image: [Female_DC_Connectors](images/Female_DC_Connectors.jpg)
+
 ### JST connector Female 3-pin
  - Type: Connector
  - Quantity: pair
