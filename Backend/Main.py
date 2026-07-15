@@ -24,7 +24,7 @@ if not GROQ_API_KEY or not TELEGRAM_BOT_TOKEN:
 groq_client = Groq(api_key=GROQ_API_KEY)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-ALLOWED_USER_ID = 123456789
+ALLOWED_USER_ID = 7092229633
 
 MAIN_MODEL_ID = "openai/gpt-oss-120b"
 BRAIN_PROMPT = (
@@ -146,6 +146,99 @@ def fetch_planet_data(planet_name):
         return f"Could not find planetary body '{planet_name}'."
     except Exception as e:
         return f"Error connecting to planetary database: {str(e)}"
+
+def fetch_earth_events():
+    """
+    NASA EONET v3 — no API key required. Returns currently open natural
+    events (wildfires, storms, volcanoes, floods, etc.) so Nova can judge
+    whether anything is new/severe enough to notify about.
+    """
+    url = "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=20"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            events = data.get("events", [])
+            if not events:
+                return "No open Earth events currently tracked by EONET."
+
+            lines = ["Currently open Earth events (most recent first):"]
+            for event in events[:10]:
+                title = event.get("title", "Unknown event")
+                categories = ", ".join(c.get("title", "") for c in event.get("categories", []))
+                geometry = event.get("geometry", [])
+                latest_date = geometry[-1].get("date") if geometry else "unknown date"
+                lines.append(f"- {title} [{categories}] (latest update: {latest_date})")
+            return "\n".join(lines)
+        return f"NASA EONET system currently unavailable (status {response.status_code})."
+    except Exception as e:
+        return f"Error fetching Earth events: {str(e)}"
+
+# ==========================================
+# SENSOR FILTER LOGIC (ESP32-ONLY, STATELESS)
+# Completely isolated from chat_history / Telegram path.
+# Nova's BRAIN_PROMPT / personality is never touched by this.
+# Satellites are NOT handled here — filtered entirely on-device by ESP32.
+# ==========================================
+
+FILTER_SYSTEM_PROMPT = """
+You are Nova's filtering engine. You will be given raw space event data
+and must decide if it's significant enough to trigger a desk notification.
+
+Respond ONLY in JSON, no prose, no markdown:
+{"notify": true/false, "priority": "low"/"medium"/"high", "reason": "<one short phrase>"}
+
+RULES:
+- Sun: notify only for M-class flares or above, or Earth-directed CMEs
+- Earth: notify only for new events or severity escalations, not routine updates
+- Mars/Saturn: notify on essentially any new event (rare by nature)
+- Moon: notify only on phase transitions (new/full/eclipse), not daily phase
+"""
+
+def filter_event(category: str, raw_event_data: str) -> dict:
+    """
+    Stateless significance check. No chat_history involved, no memory
+    between calls, no tools. One-shot classification per /sensor request.
+    """
+    try:
+        response = groq_client.chat.completions.create(
+            model=MAIN_MODEL_ID,
+            messages=[
+                {"role": "system", "content": FILTER_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Category: {category}\nData: {raw_event_data}"}
+            ],
+            response_format={"type": "json_object"}
+        )
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        # Fail safe: no notification rather than a crash reaching ESP32
+        return {"notify": False, "priority": "low", "reason": f"filter error: {str(e)}"}
+
+
+def gather_sensor_data(category: str) -> dict:
+    """
+    Pulls raw data for the requested AI category, then runs it through
+    filter_event(). Reuses existing fetch_* functions — no new API
+    integrations needed. Category is explicit (not free-text) so ESP32's
+    request doesn't rely on keyword-matching.
+    """
+    category = category.strip().lower()
+
+    if category == "sun":
+        raw_data = fetch_space_weather()
+    elif category == "mars":
+        raw_data = fetch_planet_data("mars")
+    elif category == "moon":
+        raw_data = fetch_planet_data("moon")
+    elif category == "saturn":
+        raw_data = fetch_planet_data("saturn")
+    elif category == "earth":
+        raw_data = fetch_earth_events()
+    else:
+        return {"notify": False, "priority": "low", "reason": f"unknown category: {category}"}
+
+    return filter_event(category.capitalize(), raw_data)
+
 
 def get_nova_response(user_input: str) -> str:
     global chat_history
@@ -340,6 +433,9 @@ app = FastAPI(lifespan=lifespan)
 class ChatRequest(BaseModel):
     message: str
 
+class SensorRequest(BaseModel):
+    category: str  # one of: sun, earth, mars, moon, saturn
+
 @app.get("/")
 def home():
     return {"status": "online", "agent": "Nova", "vision_systems": "connected"}
@@ -349,5 +445,19 @@ def chat(payload: ChatRequest):
     try:
         answer = get_nova_response(payload.message)
         return {"response": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/sensor")
+def sensor(payload: SensorRequest):
+    """
+    ESP32-only endpoint. Stateless — does not touch chat_history,
+    completely isolated from Telegram conversations and BRAIN_PROMPT.
+    Satellites are NOT handled here (on-device ESP32 filter instead).
+    Returns: {"notify": bool, "priority": str, "reason": str}
+    """
+    try:
+        result = gather_sensor_data(payload.category)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
