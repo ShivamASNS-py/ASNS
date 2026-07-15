@@ -1,4 +1,4 @@
-#Nova
+# Nova
 
 Nova is the AI mind behind ASNS — but she's not just a data pipeline. She's a warm, expressive conversational AI with her own personality: playful and witty when you are, gentle and supportive when you're not, and unafraid to express herself with a bit of kaomoji flair (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄). Right now, Nova lives on Telegram, where she can chat naturally, analyze photos you send her, and pull real-time space data on request — live satellite telemetry (N2YO), solar activity (NASA DONKI), and planetary physical data (Le Système Solaire), plus image search for anything you're curious about.
 She runs on Groq's gpt-oss-120b, exposed through a FastAPI /chat endpoint — the same endpoint ASNS's hardware will eventually call. The next phase of her development is what makes ASNS possible: teaching her to proactively watch space data instead of only responding when asked, and to decide what's actually worth a notification versus background noise.
