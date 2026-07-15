@@ -10,7 +10,7 @@ A compact control unit sits on the desk — a 3D-printed, rounded 11.7 × 10.5 �
 
 - **ESP32-WROVER-IE** will poll **Nova**, the AI backend, over HTTPS for space event data.
 - **Nova** (built on Groq's `gpt-oss-120b`) will pull from NASA (DONKI, EONET), N2YO (live satellite/ISS telemetry), and Le Système Solaire (planetary data), then decide what's actually worth surfacing — since raw satellite data alone updates constantly, and without filtering it would drown out every other signal.
-- A lightweight on-device filter will also run directly on the ESP32, recognizing ~15-20 major satellites (ISS, Hubble, Starlink, etc.) so simple, high-value events — like *"ISS visible in 5 minutes!"* — can trigger a notification animation without waiting on a full AI round-trip.
+- A lightweight on-device filter will also run directly on the ESP32, recognizing ~25–50 major satellites (ISS, Hubble, Starlink, etc.) so simple, high-value events — like *"ISS visible in 5 minutes!"* — can trigger a notification animation without waiting on a full AI round-trip.
 - To avoid free-tier cold starts on Render, the ESP32 will send a lightweight keep-alive ping roughly every 10 minutes, separate from its actual data requests (every 5–7 minutes).
 - When nothing's happening, the **WS2812B strip** (5m, 300 LEDs) runs a user-selected ambient pattern — Deep Space, Starfield, Moonlight, Aurora, Mars Glow, Solar Wind — in warm, low-brightness tones so it's easy to leave running while working or studying.
 - When something happens, the strip pauses ambient mode, plays a short notification animation for the relevant category (Mars, Earth, Moon, Sun, Saturn, Satellites), then fades back.
@@ -19,7 +19,7 @@ A compact control unit sits on the desk — a 3D-printed, rounded 11.7 × 10.5 �
 
 ## Meet Nova
 
-Nova isn't just a data pipeline — she's a warm, expressive AI with her own personality: playful and witty when you are, gentle and supportive when you're not, and unafraid to express herself with a bit of kaomoji flair. Today, she lives on Telegram, where she can hold a natural conversation, analyze photos sent to her, and pull real-time space data on request — satellite telemetry, solar activity, planetary data, and image search.
+Nova isn't just a data pipeline — she's a warm, expressive AI with her own personality: playful and witty when you are, gentle and supportive when you're not, and unafraid to express herself with a bit of kaomoji flair. Today, she lives on Telegram, where she can hold a natural conversation, actually look at photos sent to her using Google Lens, and pull real-time space data on request — satellite telemetry, solar activity, planetary data, and image search.
 
 She runs on Groq's `gpt-oss-120b`, exposed through a FastAPI `/chat` endpoint — the same endpoint ASNS's hardware will eventually call. Full introduction in [`backend/intro.md`](./backend/intro.md).
 
@@ -54,7 +54,7 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 
 ## Software
 
-- **Firmware** (`/firmware`) — ESP32 C++ code: LVGL UI, LED strip control, on-device satellite filter, communication with Nova. *In progress.*
+- **Firmware** (`/firmware`) — ESP32 C++ code. Networking + filtering skeleton is built: WiFi connection/reconnect handling, a keep-alive ping to Nova every 10 minutes (prevents Render cold-starts), a data-request timer every 5 minutes, and a working on-device satellite filter — checks N2YO visual pass data against elevation, magnitude, and duration thresholds for a priority-ordered list of tracked satellites (ISS, Tiangong, Hubble, more to come), with its own daily notification cap kept separate from the AI-side budget. Still pending: LED strip driving, LVGL display/touch UI, and Nova's `/sensor` endpoint to receive the filtered category data.
 - **Backend** (`/backend`) — Nova, the AI layer. Python, built on Groq's `gpt-oss-120b`, deployed as a web service on Render (free tier). Currently a fully working Telegram-based conversational AI with tool-calling (image search, satellite telemetry, solar weather, planetary data) and image vision, plus a live `/chat` API endpoint. Autonomous polling and event-filtering logic (the notification "brain" of ASNS) is the next phase of development.
 
 ## APIs used
@@ -65,31 +65,21 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 | NASA (DONKI, EONET) | Solar activity, Earth events |
 | N2YO | Live satellite/ISS telemetry, real-time position |
 | Serper (Google Images) | Image search for Nova's responses |
+| SerpAPI (Google Lens) | Vision — lets Nova actually see and identify photos sent to her |
 | Le Système Solaire | Static planetary data (gravity, mass, moons) — no key required |
 
 ## Project Status
 
 - ✅ **Backend (Nova)** — conversational AI, tool-calling, image vision, and `/chat` API all working and live on Render
-- 🔧 **Firmware** — in progress (on-device satellite filter, LVGL UI, ESP32↔Nova integration pending)
+- 🔧 **Firmware** — networking + on-device satellite filter skeleton complete (WiFi handling, Nova keep-alive/data timers, N2YO visual-pass filtering with priority list and daily cap); LED strip driving, LVGL display/touch UI, and Nova's `/sensor` endpoint still pending
 - 🔧 **Hardware** — wiring diagrams and enclosure design in progress
-- 🔧 **Autonomous filtering** — Nova currently responds on-demand via chat; proactive polling + event-significance filtering (the core "notification" logic) is the current build focus
+- 🔧 **Autonomous filtering** — satellite-side filtering logic is drafted in firmware; Nova's AI-side event-significance filtering (Sun/Earth/Mars/Moon/Saturn) is the current build focus
 - 🔧 **UI/UX** — LVGL implementation pending
 
-## Setup(OLD)
+## Want to talk to Nova?
 
-Create a `.env` file in `/backend` with:
-```
-GROQ_API_KEY=
-NASA_API_KEY=
-N2YO_API_KEY=
-TELEGRAM_BOT_TOKEN=
-SERPER_API_KEY=
-```
+Nova is live right now. If you'd like to chat with her directly — ask her about a satellite overhead, the Sun's current mood, or just say hi — reach out and I can add you to her access list. Seeing her personality in action tells you more about this project than any README section could.
 
 ---
-
-# New
-
-Anyone can chat with Nova since she runs on telegram but the user must get allowance from me. No API's required.
 
 *Built by a 15-year-old learning PCB design, embedded programming, API integration, AI, and product design — one debug session at a time. Submitted for the Hack Club Macondo grant.*
