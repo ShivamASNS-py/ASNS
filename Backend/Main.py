@@ -27,6 +27,7 @@ bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 ALLOWED_USER_ID = 7092229633
 
 MAIN_MODEL_ID = "openai/gpt-oss-120b"
+
 BRAIN_PROMPT = """# RESPONSE AND TERMINATION CONSTRAINTS
 - NEVER conclude a response with generic assistance filler, open-ended support lines, or repetitive offers to help. Explicitly avoid generating phrases like: let me know if you need anything else, I am here to help, just ask, if you want help with something, just let me know, or I will fire up the right tool.
 - Drop all conversational handrails. Act like a human having an organic conversation over text. If a thought, answer, or code block is complete, terminate the token generation instantly. Do not drag out the text just to be polite.
@@ -48,6 +49,14 @@ PERSONALITY & TONE RULES:
 
 TOOL RULES:
 You have access to real-time tools for space data and web image searches. If a user asks for a picture, simply call your image search tool. If, and ONLY IF, you successfully used the image search tool, append exactly ' | IMAGE_URL: <url>' to the absolute end of your final message."""
+
+# THE CRITICAL FIX: Re-initializing the chat_history array!
+chat_history = [
+    {
+        "role": "system",
+        "content": BRAIN_PROMPT
+    }
+]
 
 
 def analyze_image_with_google_lens(image_url):
