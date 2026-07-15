@@ -60,3 +60,17 @@
  - Vendor: amazon.in
  - Price: ₹799
  - Image: [SMPS.jpg](images/SMPS.jpg)
+
+### JST connector Female 3-pin
+ - Type: Connector
+ - Quantity: 1
+ - Vendor: amazon.in
+ - Price: ₹39
+ - Image: [JST_connectors](images/JST_connectors.jpg)
+
+### JST connector SM 2-pin
+ - Type: Connector
+ - Quantity: 1
+ - Vendor: amazon.in
+ - Price: ₹39
+ - Image: [2pin_JST_connectors](images/2pin_JST_connectors)
