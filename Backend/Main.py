@@ -49,11 +49,6 @@ BRAIN_PROMPT = (
     "If a user asks for a picture, simply call your image search tool. "
     "If, and ONLY IF, you successfully used the image search tool, append exactly ' | IMAGE_URL: <url>' to the absolute end of your final message."
 )
-
-chat_history = [
-    {
-        "role": "system",
-        "content": BRAIN_PROMPT
     }
 ]
 
