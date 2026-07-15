@@ -12,12 +12,12 @@
  - Price: ₹2,296
  - Image: [WS2812B.jpg](images/WS2812B.jpg)
    
-### WaveShare 3.2" HDMI IPS Display (H)
+### 3.5" SPI TFT ILI9488 Display 
  - Type: Display
  - Quantity: 1
  - Vendor: amazon.in
- - Price: ₹4,499
- - Image: [Waveshare IPS Display](images/Waveshare%20IPS%20Display.jpg)
+ - Price: ₹1,374
+ - Image: [TFT_SPI_PANEL](images/TFT_SPI_PANEL.jpg)
    
 ### Logic Level Shifter (SN74AHCT125N)
  - Type: Logic Level Shifter
