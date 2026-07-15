@@ -6,16 +6,16 @@ ASNS is a desk companion that quietly keeps you connected to space. A wall-mount
 
 A compact control unit sits on the desk — a 3D-printed, rounded 11.7 × 10.5 × 6 cm box housing the brains of the system, connected to the LED strip via JST connectors.
 
-## How it works (planned)
+## How it works
 
-- **ESP32-WROVER-IE** will poll **Nova**, the AI backend, over HTTPS for space event data.
-- **Nova** (built on Groq's `gpt-oss-120b`) will pull from NASA (DONKI, EONET), N2YO (live satellite/ISS telemetry), and Le Système Solaire (planetary data), then decide what's actually worth surfacing — since raw satellite data alone updates constantly, and without filtering it would drown out every other signal.
-- A lightweight on-device filter will also run directly on the ESP32, recognizing ~25–50 major satellites (ISS, Hubble, Starlink, etc.) so simple, high-value events — like *"ISS visible in 5 minutes!"* — can trigger a notification animation without waiting on a full AI round-trip.
-- To avoid free-tier cold starts on Render, the ESP32 will send a lightweight keep-alive ping roughly every 10 minutes, separate from its actual data requests (every 5–7 minutes).
+- **ESP32-WROVER-IE** polls **Nova**, the AI backend, over HTTPS for space event data.
+- **Nova** (built on Groq's `gpt-oss-120b`) pulls from NASA (DONKI, EONET), N2YO (live satellite/ISS telemetry), and Le Système Solaire (planetary data), then decides what's actually worth surfacing — since raw satellite data alone updates constantly, and without filtering it would drown out every other signal.
+- A lightweight on-device filter also runs directly on the ESP32, recognizing ~25–50 major satellites (ISS, Hubble, Starlink, etc.) so simple, high-value events — like *"ISS visible in 5 minutes!"* — can trigger a notification animation without waiting on a full AI round-trip.
+- To avoid free-tier cold starts on Render, the ESP32 sends a lightweight keep-alive ping roughly every 10 minutes, separate from its actual data requests (every 5 minutes).
 - When nothing's happening, the **WS2812B strip** (5m, 300 LEDs) runs a user-selected ambient pattern — Deep Space, Starfield, Moonlight, Aurora, Mars Glow, Solar Wind — in warm, low-brightness tones so it's easy to leave running while working or studying.
 - When something happens, the strip pauses ambient mode, plays a short notification animation for the relevant category (Mars, Earth, Moon, Sun, Saturn, Satellites), then fades back.
 
-**Note:** the autonomous polling and event-filtering system described above is the current build focus — see [Project Status](#project-status) for what's actually implemented today versus in progress.
+**Note:** the filtering logic above is implemented and live on both sides (Nova's `/sensor` endpoint and the ESP32 satellite filter) — see [Project Status](#project-status) for what's still pending on the hardware/UI side.
 
 ## Meet Nova
 
@@ -54,8 +54,8 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 
 ## Software
 
-- **Firmware** (`/firmware`) — ESP32 C++ code. Networking + filtering skeleton is built: WiFi connection/reconnect handling, a keep-alive ping to Nova every 10 minutes (prevents Render cold-starts), a data-request timer every 5 minutes, and a working on-device satellite filter — checks N2YO visual pass data against elevation, magnitude, and duration thresholds for a priority-ordered list of tracked satellites (ISS, Tiangong, Hubble, more to come), with its own daily notification cap kept separate from the AI-side budget. Still pending: LED strip driving, LVGL display/touch UI, and Nova's `/sensor` endpoint to receive the filtered category data.
-- **Backend** (`/backend`) — Nova, the AI layer. Python, built on Groq's `gpt-oss-120b`, deployed as a web service on Render (free tier). Currently a fully working Telegram-based conversational AI with tool-calling (image search, satellite telemetry, solar weather, planetary data) and image vision, plus a live `/chat` API endpoint. Autonomous polling and event-filtering logic (the notification "brain" of ASNS) is the next phase of development.
+- **Firmware** (`/firmware`) — ESP32 C++ code. Networking + filtering skeleton is built: WiFi connection/reconnect handling, a keep-alive ping to Nova every 10 minutes (prevents Render cold-starts), a data-request timer every 5 minutes, and a working on-device satellite filter — checks N2YO visual pass data against elevation, magnitude, and duration thresholds for a priority-ordered list of tracked satellites (ISS, Tiangong, Hubble, more to come), with its own daily notification cap kept separate from the AI-side budget. Nova's `/sensor` endpoint (below) is ready on the backend side; still pending on firmware: LED strip driving and LVGL display/touch UI.
+- **Backend** (`/backend`) — Nova, the AI layer. Python, built on Groq's `gpt-oss-120b`, deployed as a web service on Render (free tier). A fully working Telegram-based conversational AI with tool-calling (image search, satellite telemetry, solar weather, planetary data, Earth events via EONET) and image vision, plus a live `/chat` API endpoint. A second, fully separate `/sensor` endpoint handles the actual notification logic: given a category (Sun, Earth, Mars, Moon, Saturn), it pulls the relevant live data and runs it through a stateless significance filter with real per-category rules — e.g. Sun only notifies for M-class-or-above flares or Earth-directed CMEs, Moon only on phase transitions, Mars/Saturn on essentially any new event. This filter is fully isolated from Nova's chat personality and fails safe (no notification) if anything errors.
 
 ## APIs used
 
@@ -70,10 +70,9 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 
 ## Project Status
 
-- ✅ **Backend (Nova)** — conversational AI, tool-calling, image vision, and `/chat` API all working and live on Render
-- 🔧 **Firmware** — networking + on-device satellite filter skeleton complete (WiFi handling, Nova keep-alive/data timers, N2YO visual-pass filtering with priority list and daily cap); LED strip driving, LVGL display/touch UI, and Nova's `/sensor` endpoint still pending
+- ✅ **Backend (Nova)** — conversational AI, tool-calling, image vision, `/chat` endpoint, and the AI event-filtering `/sensor` endpoint all working and live on Render
+- 🔧 **Firmware** — networking + on-device satellite filter skeleton complete (WiFi handling, Nova keep-alive/data timers, N2YO visual-pass filtering with priority list and daily cap); LED strip driving and LVGL display/touch UI still pending
 - 🔧 **Hardware** — wiring diagrams and enclosure design in progress
-- 🔧 **Autonomous filtering** — satellite-side filtering logic is drafted in firmware; Nova's AI-side event-significance filtering (Sun/Earth/Mars/Moon/Saturn) is the current build focus
 - 🔧 **UI/UX** — LVGL implementation pending
 
 ## Want to talk to Nova?
