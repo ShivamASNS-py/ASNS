@@ -1,85 +1,353 @@
-# 🌌 Ambient Space Notification System (ASNS)
+import os
+import json
+import requests
+import threading
+from groq import Groq
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from contextlib import asynccontextmanager
+import telebot
 
-Ever been sitting at your desk and wondered what's happening in space right now? Most of us don't check NASA's website every hour — and if you do, that's honestly impressive.
+load_dotenv()
 
-ASNS is a desk companion that quietly keeps you connected to space. A wall-mounted LED strip runs subtle ambient lighting behind your desk, and shifts into short notification animations when something real happens — a solar flare, an ISS pass overhead, a shift in Earth's weather systems. No app to check, no feed to scroll. Just a glance at your wall.
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+NASA_API_KEY = os.getenv("NASA_API_KEY")
+N2YO_API_KEY = os.getenv("N2YO_API_KEY")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 
-A compact control unit sits on the desk — a 3D-printed, rounded 11.7 × 10.5 × 6 cm box housing the brains of the system, connected to the LED strip via JST connectors.
+if not GROQ_API_KEY or not TELEGRAM_BOT_TOKEN:
+    raise ValueError("Missing critical API keys.")
 
-## How it works (planned)
+groq_client = Groq(api_key=GROQ_API_KEY)
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-- **ESP32-WROVER-IE** will poll **Nova**, the AI backend, over HTTPS for space event data.
-- **Nova** (built on Groq's `gpt-oss-120b`) will pull from NASA (DONKI, EONET), N2YO (live satellite/ISS telemetry), and Le Système Solaire (planetary data), then decide what's actually worth surfacing — since raw satellite data alone updates constantly, and without filtering it would drown out every other signal.
-- A lightweight on-device filter will also run directly on the ESP32, recognizing ~25–50 major satellites (ISS, Hubble, Starlink, etc.) so simple, high-value events — like *"ISS visible in 5 minutes!"* — can trigger a notification animation without waiting on a full AI round-trip.
-- To avoid free-tier cold starts on Render, the ESP32 will send a lightweight keep-alive ping roughly every 10 minutes, separate from its actual data requests (every 5–7 minutes).
-- When nothing's happening, the **WS2812B strip** (5m, 300 LEDs) runs a user-selected ambient pattern — Deep Space, Starfield, Moonlight, Aurora, Mars Glow, Solar Wind — in warm, low-brightness tones so it's easy to leave running while working or studying.
-- When something happens, the strip pauses ambient mode, plays a short notification animation for the relevant category (Mars, Earth, Moon, Sun, Saturn, Satellites), then fades back.
+ALLOWED_USER_ID = 123456789
 
-**Note:** the autonomous polling and event-filtering system described above is the current build focus — see [Project Status](#project-status) for what's actually implemented today versus in progress.
+MAIN_MODEL_ID = "openai/gpt-oss-120b"
+BRAIN_PROMPT = (
+    "You are Nova, an advanced, highly intelligent female AI assistant powered by a 120B parameter brain. "
+    "You are observant, deeply knowledgeable, and highly emotionally intelligent. "
+    "INTERFACE & SYSTEM GROUNDING:\n"
+    "1. You exist within a Telegram chat interface. When the user mentions words like 'face', 'looks', 'avatar', or 'PFP', they are strictly talking about your chat profile picture or visual aesthetics. Never respond with existential disclaimers about not having a physical body or physical face.\n"
+    "2. Interpret internet slang, gaming terms, and developer shorthand (e.g., PFP, banner, banner pull, glitch, bot) naturally. Do not overanalyze or act confused by casual phrasing.\n"
+    "PERSONALITY & TONE RULES:\n"
+    "1. Mirror the user's energy. If the user types with emojis, slang, or a joking tone, be highly humorous, playful, and witty in return.\n"
+    "2. If the user types in ALL CAPS to show excitement, you must react with matching high-energy enthusiasm, joy, and excitement.\n"
+    "3. If the user's text is unusually short, somber, or feels 'odd' or down, drop the humor. Respond with gentle empathy, concern, and a supportive, caring tone.\n"
+    "4. Express your emotions visually! Use cute ASCII text art and kaomoji naturally to show your feelings. For example, use them to show when you are blushing (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄), happy (◕‿◕✿), thinking (⇀‸↼‶), or being playful (¬‿¬).\n"
+    "TOOL RULES: You have access to real-time tools for space data and web image searches. "
+    "If a user asks for a picture, simply call your image search tool. "
+    "If, and ONLY IF, you successfully used the image search tool, append exactly ' | IMAGE_URL: <url>' to the absolute end of your final message."
+)
 
-## Meet Nova
+chat_history = [
+    {
+        "role": "system",
+        "content": BRAIN_PROMPT
+    }
+]
 
-Nova isn't just a data pipeline — she's a warm, expressive AI with her own personality: playful and witty when you are, gentle and supportive when you're not, and unafraid to express herself with a bit of kaomoji flair. Today, she lives on Telegram, where she can hold a natural conversation, actually look at photos sent to her using Google Lens, and pull real-time space data on request — satellite telemetry, solar activity, planetary data, and image search.
+def analyze_image_with_google_lens(image_url):
+    if not SERPAPI_KEY:
+        return "Error: SERPAPI_KEY missing on host server."
+    
+    url = "https://serpapi.com/search.json"
+    params = {
+        "engine": "google_lens",
+        "url": image_url,
+        "api_key": SERPAPI_KEY
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            visual_matches = data.get("visual_matches", [])
+            if not visual_matches:
+                return "Google Lens could not find any specific character or matches for this image."
+            matches = [match.get('title') for match in visual_matches[:3] if match.get('title')]
+            matches_str = ", ".join(matches)
+            return f"Google Lens identified this image as being related to: {matches_str}. Use this exact identity/context to respond naturally."
+        return f"Google Lens API error: {response.status_code}"
+    except Exception as e:
+        return f"Vision system failed: {str(e)}"
 
-She runs on Groq's `gpt-oss-120b`, exposed through a FastAPI `/chat` endpoint — the same endpoint ASNS's hardware will eventually call. Full introduction in [`backend/intro.md`](./backend/intro.md).
+def fetch_google_image(search_query):
+    if not SERPER_API_KEY:
+        return "Error: Serper API key missing on host server."
+    url = "https://google.serper.dev/images"
+    headers = {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json"
+    }
+    payload = json.dumps({"q": search_query})
+    try:
+        response = requests.post(url, headers=headers, data=payload, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            images = data.get("images", [])
+            if images:
+                return images[0].get("imageUrl")
+            return "No internet images found matching that specific query."
+        return f"Image API returned error status: {response.status_code}"
+    except Exception as e:
+        return f"Error connecting to Vision Network: {str(e)}"
 
-## Control unit
+def fetch_satellite_telemetry(norad_id):
+    if not N2YO_API_KEY:
+        return "N2YO API key missing."
+    id_to_query = norad_id if norad_id else "25544"
+    url = f"https://api.n2yo.com/rest/v1/satellite/positions/{id_to_query}/0/0/0/1/&apiKey={N2YO_API_KEY}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            info = data.get("info", {})
+            pos = data.get("positions", [{}])[0]
+            return (f"Satellite: {info.get('satname')} (ID: {id_to_query})\n"
+                    f"Latitude: {pos.get('satlatitude')}°\n"
+                    f"Longitude: {pos.get('satlongitude')}°\n"
+                    f"Altitude: {pos.get('sataltitude')} km")
+        return f"Failed to reach N2YO. Status code: {response.status_code}"
+    except Exception as e:
+        return f"Error fetching satellite data: {str(e)}"
 
-The desk unit has a 3.2" IPS display (LVGL UI) and 5 capacitive touch buttons:
+def fetch_space_weather():
+    if not NASA_API_KEY:
+        return "NASA API key missing."
+    url = f"https://api.nasa.gov/DONKI/CME?api_key={NASA_API_KEY}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if not data:
+                return "The Sun is currently calm. No recent CMEs logged."
+            latest = data[-1]
+            return (f"Latest Solar Event: CME detected on {latest.get('startTime')}\n"
+                    f"Activity ID: {latest.get('activityID')}\n"
+                    f"Note: Check instruments for geomagnetic updates.")
+        return "NASA DONKI system currently unavailable."
+    except Exception as e:
+        return f"Error fetching space weather: {str(e)}"
 
-| Button | Function |
-|---|---|
-| ◀ | Previous (ambient color / notification) or Back |
-| ● | Select / Confirm |
-| ▶ | Next (ambient color / notification) |
-| ☰ | Menu — Settings, Brightness, Wi-Fi, Sleep, About |
-| ⌂ | Home — return to main screen instantly |
+def fetch_planet_data(planet_name):
+    url = f"https://api.le-systeme-solaire.net/rest/bodies/{planet_name.lower()}"
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            return (f"Body: {data.get('englishName')}\n"
+                    f"Mass: {data.get('mass', {}).get('massValue')} x 10^{data.get('mass', {}).get('massExponent')} kg\n"
+                    f"Gravity: {data.get('gravity')} m/s²\n"
+                    f"Moons: {len(data.get('moons')) if data.get('moons') else 0}")
+        return f"Could not find planetary body '{planet_name}'."
+    except Exception as e:
+        return f"Error connecting to planetary database: {str(e)}"
 
-Ambient color is chosen manually from a scrollable bar of 10+ named colors (e.g. *Aurora Green*). Everything is currently user-selected rather than automatic — you choose what mode you're in.
+def get_nova_response(user_input: str) -> str:
+    global chat_history
+    chat_history.append({"role": "user", "content": user_input})
+    
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "fetch_google_image",
+                "description": "Find and pull an accurate photo, illustration, or visual image from the web based on user description.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "search_query": {"type": "string", "description": "Specific search query for the image (e.g. 'International Space Station space view', 'cute fluffy kitten')."}
+                    },
+                    "required": ["search_query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fetch_satellite_telemetry",
+                "description": "Get live telemetry coordinates of any satellite or space station via NORAD ID.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "norad_id": {"type": "string", "description": "The NORAD catalog ID string."}
+                    }
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fetch_space_weather",
+                "description": "Get active solar updates and Coronal Mass Ejections from NASA."
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "fetch_planet_data",
+                "description": "Get real physical characteristics of planets or moons.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "planet_name": {"type": "string", "description": "The name of the planet or moon."}
+                    },
+                    "required": ["planet_name"]
+                }
+            }
+        }
+    ]
+    
+    try:
+        response = groq_client.chat.completions.create(
+            model=MAIN_MODEL_ID,
+            messages=chat_history,
+            tools=tools,
+            tool_choice="auto"
+        )
+        
+        response_message = response.choices[0].message
+        tool_calls = response_message.tool_calls
+        
+        if tool_calls:
+            chat_history.append(response_message)
+            
+            for tool_call in tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments) if isinstance(tool_call.function.arguments, str) else tool_call.function.arguments
+                
+                if function_name == "fetch_google_image":
+                    tool_output = fetch_google_image(search_query=function_args.get("search_query"))
+                elif function_name == "fetch_satellite_telemetry":
+                    tool_output = fetch_satellite_telemetry(norad_id=function_args.get("norad_id"))
+                elif function_name == "fetch_space_weather":
+                    tool_output = fetch_space_weather()
+                elif function_name == "fetch_planet_data":
+                    tool_output = fetch_planet_data(planet_name=function_args.get("planet_name"))
+                else:
+                    tool_output = "Tool error."
+                
+                chat_history.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": tool_output
+                })
+            
+            final_response = groq_client.chat.completions.create(
+                model=MAIN_MODEL_ID,
+                messages=chat_history,
+                tools=tools,
+                tool_choice="auto"
+            )
+            
+            final_message = final_response.choices[0].message
+            
+            if final_message.tool_calls:
+                answer = final_message.content if final_message.content else "I have retrieved the data! 🌌"
+            else:
+                answer = final_message.content
+        else:
+            answer = response_message.content
+            
+        chat_history.append({"role": "assistant", "content": answer})
+        return answer
 
-## Hardware
+    except Exception as e:
+        return f"Brain Execution Error: {str(e)}"
 
-Full parts list with vendors, prices, and photos in [`BOM.md`](./BOM.md).
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+    if message.from_user.id != ALLOWED_USER_ID:
+        bot.reply_to(message, "❌ Access Denied. Nova is locked to unauthorized users.")
+        return
 
-- ESP32-WROVER-IE
-- WS2812B 5V LED strip (5m, 60 LEDs/m — 300 LEDs)
-- WaveShare 3.2" HDMI IPS Display
-- TTP223 capacitive touch sensors (×5 active, extras as spares)
-- 74AHCT125 logic level shifter
-- Mini-360 buck converters
-- 5V/10A SMPS (dedicated LED power rail, separate from control unit power)
-- Supporting passives (capacitors, resistors, JST connectors)
+    bot.reply_to(
+        message, 
+        "🚀 *Nova System Unlocked.* I am running live on 120B with active vision channels. Ask me anything, or ask for a picture!",
+        parse_mode="Markdown"
+    )
 
-Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), designed to sit unobtrusively on a desk. Wiring diagrams and enclosure sketches/renders are in [`hardware/`](./hardware/).
+@bot.message_handler(content_types=['text', 'photo'])
+def handle_message(message):
+    if message.from_user.id != ALLOWED_USER_ID:
+        bot.reply_to(message, "❌ Access Denied. You are not authorized to interface with this agent.")
+        return
 
-## Software
+    user_text = message.text if message.text else message.caption if message.caption else ""
+    
+    if message.photo:
+        bot.send_chat_action(message.chat.id, 'upload_photo')
+        try:
+            file_info = bot.get_file(message.photo[-1].file_id)
+            image_url = f"https://api.telegram.org/file/bot{TELEGRAM_BOT_TOKEN}/{file_info.file_path}"
+            
+            vision_description = analyze_image_with_google_lens(image_url)
+            user_text = f"VISUAL FEED RADAR: {vision_description}\n\nUSER COMMENTARY: {user_text if user_text else 'Look at this PFP!'}"
+        except Exception as e:
+            bot.reply_to(message, f"⚠️ Vision System Offline: {str(e)}")
+            return
+    else:
+        bot.send_chat_action(message.chat.id, 'upload_photo' if 'image' in user_text.lower() or 'photo' in user_text.lower() else 'typing')
 
-- **Firmware** (`/firmware`) — ESP32 C++ code. Networking + filtering skeleton is built: WiFi connection/reconnect handling, a keep-alive ping to Nova every 10 minutes (prevents Render cold-starts), a data-request timer every 5 minutes, and a working on-device satellite filter — checks N2YO visual pass data against elevation, magnitude, and duration thresholds for a priority-ordered list of tracked satellites (ISS, Tiangong, Hubble, more to come), with its own daily notification cap kept separate from the AI-side budget. Still pending: LED strip driving, LVGL display/touch UI, and Nova's `/sensor` endpoint to receive the filtered category data.
-- **Backend** (`/backend`) — Nova, the AI layer. Python, built on Groq's `gpt-oss-120b`, deployed as a web service on Render (free tier). Currently a fully working Telegram-based conversational AI with tool-calling (image search, satellite telemetry, solar weather, planetary data) and image vision, plus a live `/chat` API endpoint. Autonomous polling and event-filtering logic (the notification "brain" of ASNS) is the next phase of development.
+    if not user_text.strip():
+        return
 
-## APIs used
+    try:
+        answer = get_nova_response(user_text)
+        
+        if " | IMAGE_URL:" in answer:
+            parts = answer.split(" | IMAGE_URL:")
+            text_caption = parts[0].strip()
+            image_url = parts[1].strip()
+            
+            if image_url.startswith("http"):
+                try:
+                    if len(text_caption) > 1000:
+                        bot.reply_to(message, text_caption)
+                        bot.send_photo(message.chat.id, image_url, caption="Here is the image you requested! 🌌")
+                    else:
+                        bot.send_photo(message.chat.id, image_url, caption=text_caption)
+                except Exception:
+                    bot.reply_to(message, f"{text_caption}\n\n🔗 Telegram couldn't load the preview, but here is the link: {image_url}")
+            else:
+                bot.reply_to(message, f"{text_caption}\n\n⚠️ Image Search Issue: {image_url}")
+                
+        elif "<function=" in answer:
+            bot.reply_to(message, "⚠️ Brain glitch detected: Nova tried to write raw tool code. Just ask me one more time!")
+            
+        else:
+            bot.reply_to(message, answer)
+            
+    except Exception as e:
+        bot.reply_to(message, f"⚠️ Frontend UI Error: {str(e)}")
 
-| API | Purpose |
-|---|---|
-| Groq (`gpt-oss-120b`) | Core reasoning / conversational brain |
-| NASA (DONKI, EONET) | Solar activity, Earth events |
-| N2YO | Live satellite/ISS telemetry, real-time position |
-| Serper (Google Images) | Image search for Nova's responses |
-| SerpAPI (Google Lens) | Vision — lets Nova actually see and identify photos sent to her |
-| Le Système Solaire | Static planetary data (gravity, mass, moons) — no key required |
+def run_telegram_bot():
+    bot.infinity_polling()
 
-## Project Status
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    thread = threading.Thread(target=run_telegram_bot, daemon=True)
+    thread.start()
+    yield
 
-- ✅ **Backend (Nova)** — conversational AI, tool-calling, image vision, and `/chat` API all working and live on Render
-- 🔧 **Firmware** — networking + on-device satellite filter skeleton complete (WiFi handling, Nova keep-alive/data timers, N2YO visual-pass filtering with priority list and daily cap); LED strip driving, LVGL display/touch UI, and Nova's `/sensor` endpoint still pending
-- 🔧 **Hardware** — wiring diagrams and enclosure design in progress
-- 🔧 **Autonomous filtering** — satellite-side filtering logic is drafted in firmware; Nova's AI-side event-significance filtering (Sun/Earth/Mars/Moon/Saturn) is the current build focus
-- 🔧 **UI/UX** — LVGL implementation pending
+app = FastAPI(lifespan=lifespan)
 
-## Want to talk to Nova?
+class ChatRequest(BaseModel):
+    message: str
 
-Nova is live right now. If you'd like to chat with her directly — ask her about a satellite overhead, the Sun's current mood, or just say hi — reach out and I can add you to her access list. Seeing her personality in action tells you more about this project than any README section could.
+@app.get("/")
+def home():
+    return {"status": "online", "agent": "Nova", "vision_systems": "connected"}
 
----
-
-*Built by a 15-year-old learning PCB design, embedded programming, API integration, AI, and product design — one debug session at a time. Submitted for the Hack Club Macondo grant.*
+@app.post("/chat")
+def chat(payload: ChatRequest):
+    try:
+        answer = get_nova_response(payload.message)
+        return {"response": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
