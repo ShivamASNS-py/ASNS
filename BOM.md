@@ -115,4 +115,4 @@
  - Quantity: pack of 5
  - Vendor: amazon.in
  - Price: ₹209
- - Image: [Perfboards](images/Perfboards.jpg)
+ - Image: [Perfboard](images/Perfboard.jpg)
