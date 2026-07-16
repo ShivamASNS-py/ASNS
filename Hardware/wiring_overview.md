@@ -1,6 +1,6 @@
 ## Wiring Diagram
 
-The full wiring diagram (`wiring_diagram.png`) covers the complete electrical setup for the ASNS control unit, including:
+The full wiring diagram (`Wiring_Diagram.png`) covers the complete electrical setup for the ASNS control unit, including:
 
 1. **Power input** — 5V 10A SMPS feeding the system via JST connector
 2. **Buck converter** — Mini-360 DC-DC converter providing a stable 5V rail
