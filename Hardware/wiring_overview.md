@@ -12,4 +12,4 @@ The full wiring diagram (`Wiring_Diagram.png`) covers the complete electrical se
 8. **JST connector pinouts** — power input and LED strip output
 9. **General wiring notes** — common grounding, wire gauge, and brightness-limiting guidance
 
-This diagram was AI-generated based on my BOM and finalized pin assignments, since I don't have access to diagramming software on mobile. I reviewed it against my actual components and confirmed it matches the hardware I'm using.
+This diagram was AI-generated based on my BOM and finalized pin assignments, since I don't have access to diagramming software on mobile as I'm away from my laptop. I reviewed it against my actual components and confirmed it matches the hardware I'm using.
