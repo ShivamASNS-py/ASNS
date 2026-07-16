@@ -10,7 +10,7 @@ A compact control unit sits on the desk — a 3D-printed, rounded 11.7 × 10.5 �
 
 - **ESP32-WROVER-IE** polls **Nova**, the AI backend, over HTTPS for space event data.
 - **Nova** (built on Groq's `gpt-oss-120b`) pulls from NASA (DONKI, EONET), N2YO (live satellite/ISS telemetry), and Le Système Solaire (planetary data), then decides what's actually worth surfacing — since raw satellite data alone updates constantly, and without filtering it would drown out every other signal.
-- A lightweight on-device filter also runs directly on the ESP32, recognizing ~25–50 major satellites (ISS, Hubble, Starlink, etc.) so simple, high-value events — like *"ISS visible in 5 minutes!"* — can trigger a notification animation without waiting on a full AI round-trip.
+- A lightweight on-device filter also runs directly on the ESP32, recognizing 16 tracked satellites (ISS, Tiangong, Hubble, Terra, Aqua, and more) so simple, high-value events — like *"ISS visible in 5 minutes!"* — can trigger a notification animation without waiting on a full AI round-trip.
 - To avoid free-tier cold starts on Render, the ESP32 sends a lightweight keep-alive ping roughly every 10 minutes, separate from its actual data requests (every 5 minutes).
 - When nothing's happening, the **WS2812B strip** (5m, 300 LEDs) runs a user-selected ambient pattern — Deep Space, Starfield, Moonlight, Aurora, Mars Glow, Solar Wind — in warm, low-brightness tones so it's easy to leave running while working or studying.
 - When something happens, the strip pauses ambient mode, plays a short notification animation for the relevant category (Mars, Earth, Moon, Sun, Saturn, Satellites), then fades back.
@@ -54,7 +54,7 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 
 ## Software
 
-- **Firmware** (`/firmware`) — ESP32 C++ code. Networking + filtering skeleton is built: WiFi connection/reconnect handling, a keep-alive ping to Nova every 10 minutes (prevents Render cold-starts), a data-request timer every 5 minutes, and a working on-device satellite filter — checks N2YO visual pass data against elevation, magnitude, and duration thresholds for a priority-ordered list of tracked satellites (ISS, Tiangong, Hubble, more to come), with its own daily notification cap kept separate from the AI-side budget. Nova's `/sensor` endpoint (below) is ready on the backend side; still pending on firmware: LED strip driving and LVGL display/touch UI.
+- **Firmware** (`/firmware`) — ESP32 C++ code. Networking + filtering skeleton is built: WiFi connection/reconnect handling, a keep-alive ping to Nova every 10 minutes (prevents Render cold-starts), a data-request timer every 5 minutes, and a working on-device satellite filter — checks N2YO visual pass data against elevation, magnitude, and duration thresholds for a priority-ordered list of 16 tracked satellites (ISS, Tiangong, Hubble, Terra, Aqua, and more), with its own daily notification cap kept separate from the AI-side budget. Nova's `/sensor` endpoint (below) is ready on the backend side; still pending on firmware: LED strip driving and LVGL display/touch UI.
 - **Backend** (`/backend`) — Nova, the AI layer. Python, built on Groq's `gpt-oss-120b`, deployed as a web service on Render (free tier). A fully working Telegram-based conversational AI with tool-calling (image search, satellite telemetry, solar weather, planetary data, Earth events via EONET) and image vision, plus a live `/chat` API endpoint. A second, fully separate `/sensor` endpoint handles the actual notification logic: given a category (Sun, Earth, Mars, Moon, Saturn), it pulls the relevant live data and runs it through a stateless significance filter with real per-category rules — e.g. Sun only notifies for M-class-or-above flares or Earth-directed CMEs, Moon only on phase transitions, Mars/Saturn on essentially any new event. This filter is fully isolated from Nova's chat personality and fails safe (no notification) if anything errors.
 
 ## APIs used
@@ -66,7 +66,7 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 | N2YO | Live satellite/ISS telemetry, real-time position |
 | Serper (Google Images) | Image search for Nova's responses |
 | SerpAPI (Google Lens) | Vision — lets Nova actually see and identify photos sent to her |
-| Le Système Solaire | Static planetary data (gravity, mass, moons) — no key required |
+| Le Système Solaire | Static planetary data (gravity, mass, moons) — requires a free API key |
 
 ## Project Status
 
