@@ -81,3 +81,38 @@
  - Vendor: amazon.in
  - Price: ₹39
  - Image: [2pin_JST_connectors](images/2pin_JST_connectors)
+
+### 26AWG wires
+ - Type: Wiring 
+ - Quantity: Kit(6 colors, 5ft/each)
+ - Vendor: amazon.in
+ - Price: ₹1,939
+ - Image: [26AWG_wires](images/26AWG_wires.jpg)
+
+### 18AWG wires
+ - Type: Wiring
+ - Quantity: 1
+ - Vendor: amazon.in
+ - Price: ₹699
+ - Image: [18AWG_wires](images/18AWG_wires.jpg)
+
+### Double sided tape
+ - Type: Adhesive 
+ - Quantity: 1
+ - Vendor: amazon.in
+ - Price: ₹182
+ - Image: [Double_sided_tape](images/Double_sided_tape.jpg)
+
+### 2mm 2.5mm 3mm screws
+ - Type: Hardware 
+ - Quantity: pair
+ - Vendor: amazon.in
+ - Price: ₹409
+ - Image: [screws](images/screws.jpg)
+
+### Perfboards 
+ - Type: Prototyping boards
+ - Quantity: pack of 5
+ - Vendor: amazon.in
+ - Price: ₹209
+ - Image: [Perfboards](images/Perfboards.jpg)
