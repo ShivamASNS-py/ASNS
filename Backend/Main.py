@@ -17,6 +17,7 @@ N2YO_API_KEY = os.getenv("N2YO_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+SOLAR_API_KEY = os.getenv("SOLAR_API_KEY")  # required now — api.le-systeme-solaire.net added mandatory auth
 
 if not GROQ_API_KEY or not TELEGRAM_BOT_TOKEN:
     raise ValueError("Missing critical API keys.")
@@ -144,14 +145,17 @@ def fetch_space_weather():
 
 def fetch_planet_data(planet_name):
     url = f"https://api.le-systeme-solaire.net/rest/bodies/{planet_name.lower()}"
+    headers = {"Authorization": f"Bearer {SOLAR_API_KEY}"} if SOLAR_API_KEY else {}
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             data = response.json()
             return (f"Body: {data.get('englishName')}\n"
                     f"Mass: {data.get('mass', {}).get('massValue')} x 10^{data.get('mass', {}).get('massExponent')} kg\n"
                     f"Gravity: {data.get('gravity')} m/s²\n"
                     f"Moons: {len(data.get('moons')) if data.get('moons') else 0}")
+        if response.status_code == 401:
+            return "Planetary database rejected the request — API key missing or invalid (SOLAR_API_KEY)."
         return f"Could not find planetary body '{planet_name}'."
     except Exception as e:
         return f"Error connecting to planetary database: {str(e)}"
@@ -245,6 +249,13 @@ def gather_sensor_data(category: str) -> dict:
         raw_data = fetch_earth_events()
     else:
         return {"notify": False, "priority": "low", "reason": f"unknown category: {category}"}
+
+    # Fail safe: if the fetch itself failed (API error, timeout, missing key,
+    # auth rejection), don't hand that error string to the LLM filter — it
+    # can misread "error" language as a significant event and notify anyway.
+    error_markers = ("error", "unavailable", "missing", "could not find", "failed")
+    if any(marker in raw_data.lower() for marker in error_markers):
+        return {"notify": False, "priority": "low", "reason": f"data fetch failed: {raw_data}"}
 
     return filter_event(category.capitalize(), raw_data)
 
@@ -417,56 +428,4 @@ def handle_message(message):
                 except Exception:
                     bot.reply_to(message, f"{text_caption}\n\n🔗 Telegram couldn't load the preview, but here is the link: {image_url}")
             else:
-                bot.reply_to(message, f"{text_caption}\n\n⚠️ Image Search Issue: {image_url}")
-                
-        elif "<function=" in answer:
-            bot.reply_to(message, "⚠️ Brain glitch detected: Nova tried to write raw tool code. Just ask me one more time!")
-            
-        else:
-            bot.reply_to(message, answer)
-            
-    except Exception as e:
-        bot.reply_to(message, f"⚠️ Frontend UI Error: {str(e)}")
-
-def run_telegram_bot():
-    bot.infinity_polling()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    thread = threading.Thread(target=run_telegram_bot, daemon=True)
-    thread.start()
-    yield
-
-app = FastAPI(lifespan=lifespan)
-
-class ChatRequest(BaseModel):
-    message: str
-
-class SensorRequest(BaseModel):
-    category: str  # one of: sun, earth, mars, moon, saturn
-
-@app.get("/")
-def home():
-    return {"status": "online", "agent": "Nova", "vision_systems": "connected"}
-
-@app.post("/chat")
-def chat(payload: ChatRequest):
-    try:
-        answer = get_nova_response(payload.message)
-        return {"response": answer}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/sensor")
-def sensor(payload: SensorRequest):
-    """
-    ESP32-only endpoint. Stateless — does not touch chat_history,
-    completely isolated from Telegram conversations and BRAIN_PROMPT.
-    Satellites are NOT handled here (on-device ESP32 filter instead).
-    Returns: {"notify": bool, "priority": str, "reason": str}
-    """
-    try:
-        result = gather_sensor_data(payload.category)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+                bot.reply_to(message, f"{te
