@@ -67,7 +67,7 @@ const long GMT_OFFSET_SEC = 5.5 * 3600;
 const int DAYLIGHT_OFFSET_SEC = 0;
 const char* NTP_SERVER = "pool.ntp.org";
 
-// ==================== SETUP ====================
+// SETUP
 
 void setup() {
   Serial.begin(115200);
