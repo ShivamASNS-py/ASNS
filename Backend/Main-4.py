@@ -469,6 +469,10 @@ class SensorRequest(BaseModel):
 def home():
     return {"status": "online", "agent": "Nova", "vision_systems": "connected"}
 
+@app.head("/")
+def home_head():
+    return {}
+
 @app.post("/chat")
 def chat(payload: ChatRequest):
     try:
