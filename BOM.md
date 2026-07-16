@@ -116,3 +116,10 @@
  - Vendor: amazon.in
  - Price: ₹209
  - Image: [Perfboard](images/Perfboard.jpg)
+
+### 3D design/Enclosure 
+ - Type: Enclosure 
+ - Quantity: 1
+ - Vendor: Make3D
+ - Price: ₹6000
+ - Image: [
