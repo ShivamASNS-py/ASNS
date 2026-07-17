@@ -122,4 +122,3 @@
  - Quantity: 1
  - Vendor: Make3D
  - Price: ₹6000
- - Image: [
