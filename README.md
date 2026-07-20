@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/ASNS_logo.png" width="220" alt="ASNS Logo">
+  <img src="images/ASNS_logo.jpg" width="220" alt="ASNS Logo">
 
   # Ambient Space Notification System (ASNS)
 
