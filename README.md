@@ -1,4 +1,10 @@
-# 🌌 Ambient Space Notification System (ASNS)
+<div align="center">
+  <img src="images/asns_logo.png" width="220" alt="ASNS Logo">
+
+  # Ambient Space Notification System (ASNS)
+
+  ### Stay informed. Stay inspired.
+</div>
 
 Ever been sitting at your desk and wondered what's happening in space right now? Most of us don't check NASA's website every hour — and if you do, that's honestly impressive.
 
