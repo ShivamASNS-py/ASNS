@@ -187,12 +187,7 @@ def fetch_earth_events():
     except Exception as e:
         return f"Error fetching Earth events: {str(e)}"
 
-# ==========================================
-# SENSOR FILTER LOGIC (ESP32-ONLY, STATELESS)
-# Completely isolated from chat_history / Telegram path.
-# Nova's BRAIN_PROMPT / personality is never touched by this.
-# Satellites are NOT handled here — filtered entirely on-device by ESP32.
-# ==========================================
+
 
 FILTER_SYSTEM_PROMPT = """
 You are Nova's filtering engine. You will be given raw space event data
