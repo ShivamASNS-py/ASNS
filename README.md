@@ -33,8 +33,8 @@ She runs on Groq's `gpt-oss-120b`, exposed through a FastAPI `/chat` endpoint �
 
 The desk unit has a 3.2" IPS display (LVGL UI) and 5 capacitive touch buttons:
 
-| Button | Function |
-|---|---|
+ Button Function 
+
 | ◀ | Previous (ambient color / notification) or Back |
 | ● | Select / Confirm |
 | ▶ | Next (ambient color / notification) |
