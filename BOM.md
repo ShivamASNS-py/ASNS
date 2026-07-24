@@ -120,5 +120,6 @@
 ### 3D design/Enclosure 
  - Type: Enclosure 
  - Quantity: 1
- - Vendor: Make3D
- - Price: ₹6000
+ - Vendor: Champ3d
+ - Price: ₹2,846
+ 
