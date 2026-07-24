@@ -100,8 +100,8 @@
  - Type: Adhesive 
  - Quantity: 1
  - Vendor: amazon.in
- - Price: ₹182
- - Image: [Double_sided_tape](images/Double_sided_tape.jpg)
+ - Price: ₹185
+ - Image: [Scotch_double_sided_tape](images/Scotch_double_sided_tape.jpg)
 
 ### 2mm 2.5mm 3mm screws
  - Type: Hardware 
@@ -114,7 +114,7 @@
  - Type: Prototyping boards
  - Quantity: pack of 5
  - Vendor: amazon.in
- - Price: ₹209
+ - Price: ₹324
  - Image: [Perfboard](images/Perfboard.jpg)
 
 ### 3D design/Enclosure 
