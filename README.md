@@ -66,12 +66,21 @@ Enclosure is 3D printed (material TBD — likely PLA or acrylic-finish print), d
 ## APIs used
 
 | API | Purpose |
-|---|---|
+
 | Groq (`gpt-oss-120b`) | Core reasoning / conversational brain |
+
 | NASA (DONKI, EONET) | Solar activity, Earth events |
+
+
 | N2YO | Live satellite/ISS telemetry, real-time position |
+
+
 | Serper (Google Images) | Image search for Nova's responses |
+
+
 | SerpAPI (Google Lens) | Vision — lets Nova actually see and identify photos sent to her |
+
+
 | Le Système Solaire | Static planetary data (gravity, mass, moons) — requires a free API key |
 
 ## Project Status
