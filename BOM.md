@@ -121,5 +121,5 @@
  - Type: Enclosure 
  - Quantity: 1
  - Vendor: Champ3d
- - Price: ₹2,846
+ - Price: ₹2,874
  
