@@ -5,6 +5,3 @@ Some internal mechanical features are intentionally left for professional custom
 
 The final enclosure should prioritize easy assembly, serviceability, structural strength, and clean cable routing while preserving the existing external appearance and dimensions.
 
-### Pending 
-
-The enclosure design was handed over to champ3d but the designers are still reviewing it so I can't upload a .STL file right now. that's why I added .step. .STL will be uploaded once the designers send me final design.
